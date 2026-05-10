@@ -4,6 +4,8 @@ work in progress.
 
 this repo is for a study on whether rich datacenter telemetry can help detect, rule out, and explain large AI training runs on monitored GPU clusters
 
+[try-out interface](https://idacy.github.io/datacenter-verification/index.html)
+
 basic idea: access to the right internal datacenter data - then a large training run should leave a pattern including several layers;
 
 - enough accelerator capacity to make the run possible
