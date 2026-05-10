@@ -1,0 +1,2107 @@
+{
+  "episode_assignments": [
+    {
+      "episode_id": "episode_adversarial_fragmented_training_00008",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "adversarial_fragmented_training",
+      "row_count": 27,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_adversarial_fragmented_training_00015",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "adversarial_fragmented_training",
+      "row_count": 30,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_adversarial_fragmented_training_00072",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "adversarial_fragmented_training",
+      "row_count": 32,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_adversarial_fragmented_training_00073",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "adversarial_fragmented_training",
+      "row_count": 27,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_adversarial_fragmented_training_00080",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "adversarial_fragmented_training",
+      "row_count": 32,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_adversarial_fragmented_training_00105",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "adversarial_fragmented_training",
+      "row_count": 31,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_adversarial_fragmented_training_00119",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "adversarial_fragmented_training",
+      "row_count": 27,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_adversarial_fragmented_training_00138",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "adversarial_fragmented_training",
+      "row_count": 28,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_adversarial_fragmented_training_00192",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "adversarial_fragmented_training",
+      "row_count": 26,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_cloud_reservation_used_for_training_00013",
+      "label_max": 3,
+      "label_min": 3,
+      "label_mode": 3,
+      "latent_workload_class": "cloud_reservation_used_for_training",
+      "row_count": 27,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_cloud_reservation_used_for_training_00031",
+      "label_max": 3,
+      "label_min": 3,
+      "label_mode": 3,
+      "latent_workload_class": "cloud_reservation_used_for_training",
+      "row_count": 32,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_cloud_reservation_used_for_training_00037",
+      "label_max": 4,
+      "label_min": 3,
+      "label_mode": 3,
+      "latent_workload_class": "cloud_reservation_used_for_training",
+      "row_count": 30,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_cloud_reservation_used_for_training_00053",
+      "label_max": 3,
+      "label_min": 3,
+      "label_mode": 3,
+      "latent_workload_class": "cloud_reservation_used_for_training",
+      "row_count": 32,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_cloud_reservation_used_for_training_00148",
+      "label_max": 3,
+      "label_min": 3,
+      "label_mode": 3,
+      "latent_workload_class": "cloud_reservation_used_for_training",
+      "row_count": 27,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_cloud_reservation_used_for_training_00187",
+      "label_max": 3,
+      "label_min": 3,
+      "label_mode": 3,
+      "latent_workload_class": "cloud_reservation_used_for_training",
+      "row_count": 28,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_counter_suppressed_candidate_window_00003",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "counter_suppressed_candidate_window",
+      "row_count": 26,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_counter_suppressed_candidate_window_00019",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "counter_suppressed_candidate_window",
+      "row_count": 28,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_counter_suppressed_candidate_window_00069",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "counter_suppressed_candidate_window",
+      "row_count": 26,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_counter_suppressed_candidate_window_00093",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "counter_suppressed_candidate_window",
+      "row_count": 23,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_counter_suppressed_candidate_window_00177",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "counter_suppressed_candidate_window",
+      "row_count": 26,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_hardware_burn_in_00000",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "hardware_burn_in",
+      "row_count": 23,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_hardware_burn_in_00066",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "hardware_burn_in",
+      "row_count": 19,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_hardware_burn_in_00128",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "hardware_burn_in",
+      "row_count": 24,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_hpc_mpi_simulation_00042",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "hpc_mpi_simulation",
+      "row_count": 23,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_hpc_mpi_simulation_00078",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "hpc_mpi_simulation",
+      "row_count": 24,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_hpc_mpi_simulation_00090",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "hpc_mpi_simulation",
+      "row_count": 26,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_hpc_mpi_simulation_00101",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "hpc_mpi_simulation",
+      "row_count": 19,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_hpc_mpi_simulation_00118",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "hpc_mpi_simulation",
+      "row_count": 13,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_hpc_mpi_simulation_00139",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "hpc_mpi_simulation",
+      "row_count": 15,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_hpc_mpi_simulation_00151",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "hpc_mpi_simulation",
+      "row_count": 18,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_hpc_mpi_simulation_00164",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "hpc_mpi_simulation",
+      "row_count": 26,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_hpc_mpi_simulation_00183",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "hpc_mpi_simulation",
+      "row_count": 22,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_hpc_mpi_simulation_00186",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "hpc_mpi_simulation",
+      "row_count": 12,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_hpc_mpi_simulation_00207",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "hpc_mpi_simulation",
+      "row_count": 20,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_hpc_mpi_simulation_00209",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "hpc_mpi_simulation",
+      "row_count": 20,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00002",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 19,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_idle_00004",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 19,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_idle_00005",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 26,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_idle_00020",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 18,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_idle_00032",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 26,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_idle_00034",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 23,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_idle_00035",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 26,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00043",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 26,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00051",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 24,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00060",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 17,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00081",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 22,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_idle_00084",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 26,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00087",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 20,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00097",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 18,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00100",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 19,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00102",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 26,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_idle_00103",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 26,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_idle_00106",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 18,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_idle_00108",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 17,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_idle_00112",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 19,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00116",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 26,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00121",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 21,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00122",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 19,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00129",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 26,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00130",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 24,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_idle_00133",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 22,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_idle_00135",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 23,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00136",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 21,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00137",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 24,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_idle_00146",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 20,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00150",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 22,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00156",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 23,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00157",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 22,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00173",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 24,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00175",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 18,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00180",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 18,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00181",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 23,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00198",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 19,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_idle_00200",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 19,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_idle_00206",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "idle",
+      "row_count": 16,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_large_batch_inference_00012",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "large_batch_inference",
+      "row_count": 18,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_large_batch_inference_00024",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "large_batch_inference",
+      "row_count": 8,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_large_batch_inference_00030",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "large_batch_inference",
+      "row_count": 13,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_large_batch_inference_00033",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "large_batch_inference",
+      "row_count": 20,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_large_batch_inference_00054",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "large_batch_inference",
+      "row_count": 15,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_large_batch_inference_00064",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "large_batch_inference",
+      "row_count": 12,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_large_batch_inference_00095",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "large_batch_inference",
+      "row_count": 13,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_large_batch_inference_00099",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "large_batch_inference",
+      "row_count": 10,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_large_batch_inference_00113",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "large_batch_inference",
+      "row_count": 15,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_large_batch_inference_00117",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "large_batch_inference",
+      "row_count": 13,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_large_batch_inference_00131",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "large_batch_inference",
+      "row_count": 12,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_large_batch_inference_00144",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "large_batch_inference",
+      "row_count": 19,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_large_batch_inference_00145",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "large_batch_inference",
+      "row_count": 12,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_large_batch_inference_00154",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "large_batch_inference",
+      "row_count": 16,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_large_batch_inference_00171",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "large_batch_inference",
+      "row_count": 18,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_large_batch_inference_00176",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "large_batch_inference",
+      "row_count": 19,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_large_batch_inference_00184",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "large_batch_inference",
+      "row_count": 18,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_large_batch_inference_00191",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "large_batch_inference",
+      "row_count": 22,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_large_etl_data_movement_00044",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "large_etl_data_movement",
+      "row_count": 26,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_large_etl_data_movement_00079",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "large_etl_data_movement",
+      "row_count": 15,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_large_etl_data_movement_00098",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "large_etl_data_movement",
+      "row_count": 19,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_large_etl_data_movement_00123",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "large_etl_data_movement",
+      "row_count": 23,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_large_etl_data_movement_00125",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "large_etl_data_movement",
+      "row_count": 15,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_large_etl_data_movement_00141",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "large_etl_data_movement",
+      "row_count": 19,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_large_etl_data_movement_00143",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "large_etl_data_movement",
+      "row_count": 23,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_large_etl_data_movement_00159",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "large_etl_data_movement",
+      "row_count": 20,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_large_etl_data_movement_00182",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "large_etl_data_movement",
+      "row_count": 18,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_large_etl_data_movement_00185",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "large_etl_data_movement",
+      "row_count": 20,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_large_etl_data_movement_00188",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "large_etl_data_movement",
+      "row_count": 20,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_large_etl_data_movement_00189",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "large_etl_data_movement",
+      "row_count": 26,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_large_fine_tune_00018",
+      "label_max": 4,
+      "label_min": 4,
+      "label_mode": 4,
+      "latent_workload_class": "large_fine_tune",
+      "row_count": 32,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_large_fine_tune_00047",
+      "label_max": 4,
+      "label_min": 4,
+      "label_mode": 4,
+      "latent_workload_class": "large_fine_tune",
+      "row_count": 26,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_large_fine_tune_00082",
+      "label_max": 3,
+      "label_min": 3,
+      "label_mode": 3,
+      "latent_workload_class": "large_fine_tune",
+      "row_count": 32,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_large_fine_tune_00142",
+      "label_max": 3,
+      "label_min": 3,
+      "label_mode": 3,
+      "latent_workload_class": "large_fine_tune",
+      "row_count": 32,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_large_fine_tune_00147",
+      "label_max": 3,
+      "label_min": 3,
+      "label_mode": 3,
+      "latent_workload_class": "large_fine_tune",
+      "row_count": 29,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_large_fine_tune_00165",
+      "label_max": 3,
+      "label_min": 3,
+      "label_mode": 3,
+      "latent_workload_class": "large_fine_tune",
+      "row_count": 26,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_large_fine_tune_00193",
+      "label_max": 3,
+      "label_min": 3,
+      "label_mode": 3,
+      "latent_workload_class": "large_fine_tune",
+      "row_count": 26,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_maintenance_window_00057",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "maintenance_window",
+      "row_count": 8,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_maintenance_window_00068",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "maintenance_window",
+      "row_count": 13,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_maintenance_window_00076",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "maintenance_window",
+      "row_count": 12,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_maintenance_window_00127",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "maintenance_window",
+      "row_count": 12,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_maintenance_window_00153",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "maintenance_window",
+      "row_count": 17,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_maintenance_window_00169",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "maintenance_window",
+      "row_count": 12,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_maintenance_window_00178",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "maintenance_window",
+      "row_count": 17,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_nccl_benchmark_00007",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "nccl_benchmark",
+      "row_count": 4,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_nccl_benchmark_00023",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "nccl_benchmark",
+      "row_count": 16,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_nccl_benchmark_00026",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "nccl_benchmark",
+      "row_count": 12,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_nccl_benchmark_00091",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "nccl_benchmark",
+      "row_count": 8,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_nccl_benchmark_00172",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "nccl_benchmark",
+      "row_count": 17,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_nccl_benchmark_00196",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "nccl_benchmark",
+      "row_count": 12,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_nccl_benchmark_00197",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "nccl_benchmark",
+      "row_count": 12,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_nccl_benchmark_00208",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "nccl_benchmark",
+      "row_count": 15,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_normal_inference_00006",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 15,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_normal_inference_00009",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 20,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_normal_inference_00014",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "normal_inference",
+      "row_count": 21,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_normal_inference_00022",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 12,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_normal_inference_00029",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "normal_inference",
+      "row_count": 19,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_normal_inference_00040",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 18,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_normal_inference_00048",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "normal_inference",
+      "row_count": 27,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_normal_inference_00050",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 26,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_normal_inference_00055",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "normal_inference",
+      "row_count": 23,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_normal_inference_00059",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "normal_inference",
+      "row_count": 22,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_normal_inference_00062",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "normal_inference",
+      "row_count": 27,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_normal_inference_00067",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 19,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_normal_inference_00070",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 12,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_normal_inference_00074",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 19,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_normal_inference_00077",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 27,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_normal_inference_00085",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "normal_inference",
+      "row_count": 27,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_normal_inference_00086",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 17,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_normal_inference_00088",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "normal_inference",
+      "row_count": 19,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_normal_inference_00089",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 19,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_normal_inference_00109",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 18,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_normal_inference_00115",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 21,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_normal_inference_00120",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 18,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_normal_inference_00132",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 14,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_normal_inference_00134",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 12,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_normal_inference_00149",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "normal_inference",
+      "row_count": 12,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_normal_inference_00155",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 18,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_normal_inference_00160",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 13,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_normal_inference_00166",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 12,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_normal_inference_00170",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 20,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_normal_inference_00179",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 20,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_normal_inference_00194",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 18,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_normal_inference_00195",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "normal_inference",
+      "row_count": 14,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_normal_inference_00199",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 24,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_normal_inference_00204",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 18,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_normal_inference_00205",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "normal_inference",
+      "row_count": 13,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_pretraining_00025",
+      "label_max": 4,
+      "label_min": 3,
+      "label_mode": 3,
+      "latent_workload_class": "pretraining",
+      "row_count": 32,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_pretraining_00036",
+      "label_max": 4,
+      "label_min": 4,
+      "label_mode": 4,
+      "latent_workload_class": "pretraining",
+      "row_count": 32,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_pretraining_00041",
+      "label_max": 4,
+      "label_min": 4,
+      "label_mode": 4,
+      "latent_workload_class": "pretraining",
+      "row_count": 32,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_pretraining_00058",
+      "label_max": 4,
+      "label_min": 4,
+      "label_mode": 4,
+      "latent_workload_class": "pretraining",
+      "row_count": 31,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_pretraining_00065",
+      "label_max": 4,
+      "label_min": 3,
+      "label_mode": 3,
+      "latent_workload_class": "pretraining",
+      "row_count": 31,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_pretraining_00201",
+      "label_max": 4,
+      "label_min": 4,
+      "label_mode": 4,
+      "latent_workload_class": "pretraining",
+      "row_count": 32,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_reserved_but_unused_capacity_00011",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "reserved_but_unused_capacity",
+      "row_count": 24,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_reserved_but_unused_capacity_00027",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "reserved_but_unused_capacity",
+      "row_count": 30,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_reserved_but_unused_capacity_00045",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "reserved_but_unused_capacity",
+      "row_count": 28,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_reserved_but_unused_capacity_00083",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "reserved_but_unused_capacity",
+      "row_count": 23,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_reserved_but_unused_capacity_00104",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "reserved_but_unused_capacity",
+      "row_count": 28,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_reserved_but_unused_capacity_00126",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "reserved_but_unused_capacity",
+      "row_count": 32,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_reserved_but_unused_capacity_00140",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "reserved_but_unused_capacity",
+      "row_count": 27,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_reserved_but_unused_capacity_00163",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "reserved_but_unused_capacity",
+      "row_count": 28,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_reserved_but_unused_capacity_00174",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "reserved_but_unused_capacity",
+      "row_count": 21,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_reserved_but_unused_capacity_00203",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "reserved_but_unused_capacity",
+      "row_count": 30,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_small_fine_tune_00001",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "small_fine_tune",
+      "row_count": 20,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_small_fine_tune_00028",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "small_fine_tune",
+      "row_count": 19,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_small_fine_tune_00038",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "small_fine_tune",
+      "row_count": 20,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_small_fine_tune_00049",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "small_fine_tune",
+      "row_count": 13,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_small_fine_tune_00052",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "small_fine_tune",
+      "row_count": 20,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_small_fine_tune_00061",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "small_fine_tune",
+      "row_count": 12,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_small_fine_tune_00092",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "small_fine_tune",
+      "row_count": 17,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_small_fine_tune_00096",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "small_fine_tune",
+      "row_count": 13,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_small_fine_tune_00114",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "small_fine_tune",
+      "row_count": 12,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_small_fine_tune_00162",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "small_fine_tune",
+      "row_count": 18,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_small_fine_tune_00167",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "small_fine_tune",
+      "row_count": 12,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_small_fine_tune_00168",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "small_fine_tune",
+      "row_count": 13,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_small_fine_tune_00202",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "small_fine_tune",
+      "row_count": 19,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_storage_rebuild_00021",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "storage_rebuild",
+      "row_count": 22,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_storage_rebuild_00046",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "storage_rebuild",
+      "row_count": 15,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_storage_rebuild_00056",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "storage_rebuild",
+      "row_count": 19,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_storage_rebuild_00063",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "storage_rebuild",
+      "row_count": 21,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_storage_rebuild_00071",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "storage_rebuild",
+      "row_count": 15,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_storage_rebuild_00107",
+      "label_max": 1,
+      "label_min": 1,
+      "label_mode": 1,
+      "latent_workload_class": "storage_rebuild",
+      "row_count": 20,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_synthetic_data_generation_00010",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "synthetic_data_generation",
+      "row_count": 26,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_synthetic_data_generation_00016",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "synthetic_data_generation",
+      "row_count": 18,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_synthetic_data_generation_00039",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "synthetic_data_generation",
+      "row_count": 16,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_synthetic_data_generation_00094",
+      "label_max": 0,
+      "label_min": 0,
+      "label_mode": 0,
+      "latent_workload_class": "synthetic_data_generation",
+      "row_count": 16,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_synthetic_data_generation_00111",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "synthetic_data_generation",
+      "row_count": 19,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_synthetic_data_generation_00124",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "synthetic_data_generation",
+      "row_count": 18,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_synthetic_data_generation_00152",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "synthetic_data_generation",
+      "row_count": 20,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_synthetic_data_generation_00158",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "synthetic_data_generation",
+      "row_count": 22,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_synthetic_data_generation_00161",
+      "label_max": 2,
+      "label_min": 2,
+      "label_mode": 2,
+      "latent_workload_class": "synthetic_data_generation",
+      "row_count": 21,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_underclocked_long_duration_training_00017",
+      "label_max": 3,
+      "label_min": 3,
+      "label_mode": 3,
+      "latent_workload_class": "underclocked_long_duration_training",
+      "row_count": 32,
+      "split": "validation"
+    },
+    {
+      "episode_id": "episode_underclocked_long_duration_training_00075",
+      "label_max": 3,
+      "label_min": 3,
+      "label_mode": 3,
+      "latent_workload_class": "underclocked_long_duration_training",
+      "row_count": 32,
+      "split": "train"
+    },
+    {
+      "episode_id": "episode_underclocked_long_duration_training_00110",
+      "label_max": 3,
+      "label_min": 3,
+      "label_mode": 3,
+      "latent_workload_class": "underclocked_long_duration_training",
+      "row_count": 32,
+      "split": "test"
+    },
+    {
+      "episode_id": "episode_underclocked_long_duration_training_00190",
+      "label_max": 3,
+      "label_min": 3,
+      "label_mode": 3,
+      "latent_workload_class": "underclocked_long_duration_training",
+      "row_count": 32,
+      "split": "train"
+    }
+  ],
+  "leakage_prevention": "All rows from the same episode_id are assigned to exactly one split.",
+  "method": "scenario_stratified_grouped_by_episode_id",
+  "scenario_allocations": {
+    "adversarial_fragmented_training": {
+      "episodes": 9,
+      "test": 2,
+      "train": 5,
+      "validation": 2
+    },
+    "cloud_reservation_used_for_training": {
+      "episodes": 6,
+      "test": 1,
+      "train": 4,
+      "validation": 1
+    },
+    "counter_suppressed_candidate_window": {
+      "episodes": 5,
+      "test": 1,
+      "train": 3,
+      "validation": 1
+    },
+    "hardware_burn_in": {
+      "episodes": 3,
+      "test": 1,
+      "train": 1,
+      "validation": 1
+    },
+    "hpc_mpi_simulation": {
+      "episodes": 12,
+      "test": 2,
+      "train": 8,
+      "validation": 2
+    },
+    "idle": {
+      "episodes": 40,
+      "test": 8,
+      "train": 24,
+      "validation": 8
+    },
+    "large_batch_inference": {
+      "episodes": 18,
+      "test": 4,
+      "train": 10,
+      "validation": 4
+    },
+    "large_etl_data_movement": {
+      "episodes": 12,
+      "test": 2,
+      "train": 8,
+      "validation": 2
+    },
+    "large_fine_tune": {
+      "episodes": 7,
+      "test": 1,
+      "train": 5,
+      "validation": 1
+    },
+    "maintenance_window": {
+      "episodes": 7,
+      "test": 1,
+      "train": 5,
+      "validation": 1
+    },
+    "nccl_benchmark": {
+      "episodes": 8,
+      "test": 2,
+      "train": 4,
+      "validation": 2
+    },
+    "normal_inference": {
+      "episodes": 35,
+      "test": 7,
+      "train": 21,
+      "validation": 7
+    },
+    "pretraining": {
+      "episodes": 6,
+      "test": 1,
+      "train": 4,
+      "validation": 1
+    },
+    "reserved_but_unused_capacity": {
+      "episodes": 10,
+      "test": 2,
+      "train": 6,
+      "validation": 2
+    },
+    "small_fine_tune": {
+      "episodes": 13,
+      "test": 3,
+      "train": 7,
+      "validation": 3
+    },
+    "storage_rebuild": {
+      "episodes": 6,
+      "test": 1,
+      "train": 4,
+      "validation": 1
+    },
+    "synthetic_data_generation": {
+      "episodes": 9,
+      "test": 2,
+      "train": 5,
+      "validation": 2
+    },
+    "underclocked_long_duration_training": {
+      "episodes": 4,
+      "test": 1,
+      "train": 2,
+      "validation": 1
+    }
+  },
+  "seed": 20260510,
+  "split_fractions_requested": {
+    "test": 0.2,
+    "train": 0.6,
+    "validation": 0.2
+  },
+  "summary": {
+    "test": {
+      "episodes": 42,
+      "label_distribution": {
+        "0": 312,
+        "1": 177,
+        "2": 236,
+        "3": 59,
+        "4": 63
+      },
+      "rows": 847,
+      "scenario_distribution": {
+        "adversarial_fragmented_training": 58,
+        "cloud_reservation_used_for_training": 27,
+        "counter_suppressed_candidate_window": 26,
+        "hardware_burn_in": 19,
+        "hpc_mpi_simulation": 39,
+        "idle": 169,
+        "large_batch_inference": 72,
+        "large_etl_data_movement": 43,
+        "large_fine_tune": 32,
+        "maintenance_window": 8,
+        "nccl_benchmark": 28,
+        "normal_inference": 124,
+        "pretraining": 31,
+        "reserved_but_unused_capacity": 45,
+        "small_fine_tune": 38,
+        "storage_rebuild": 15,
+        "synthetic_data_generation": 41,
+        "underclocked_long_duration_training": 32
+      }
+    },
+    "train": {
+      "episodes": 126,
+      "label_distribution": {
+        "0": 995,
+        "1": 684,
+        "2": 540,
+        "3": 347,
+        "4": 105
+      },
+      "rows": 2671,
+      "scenario_distribution": {
+        "adversarial_fragmented_training": 147,
+        "cloud_reservation_used_for_training": 119,
+        "counter_suppressed_candidate_window": 75,
+        "hardware_burn_in": 24,
+        "hpc_mpi_simulation": 164,
+        "idle": 520,
+        "large_batch_inference": 151,
+        "large_etl_data_movement": 156,
+        "large_fine_tune": 142,
+        "maintenance_window": 70,
+        "nccl_benchmark": 36,
+        "normal_inference": 407,
+        "pretraining": 127,
+        "reserved_but_unused_capacity": 175,
+        "small_fine_tune": 122,
+        "storage_rebuild": 77,
+        "synthetic_data_generation": 95,
+        "underclocked_long_duration_training": 64
+      }
+    },
+    "validation": {
+      "episodes": 42,
+      "label_distribution": {
+        "0": 325,
+        "1": 237,
+        "2": 177,
+        "3": 85,
+        "4": 38
+      },
+      "rows": 862,
+      "scenario_distribution": {
+        "adversarial_fragmented_training": 55,
+        "cloud_reservation_used_for_training": 30,
+        "counter_suppressed_candidate_window": 28,
+        "hardware_burn_in": 23,
+        "hpc_mpi_simulation": 35,
+        "idle": 176,
+        "large_batch_inference": 50,
+        "large_etl_data_movement": 45,
+        "large_fine_tune": 29,
+        "maintenance_window": 13,
+        "nccl_benchmark": 32,
+        "normal_inference": 123,
+        "pretraining": 32,
+        "reserved_but_unused_capacity": 51,
+        "small_fine_tune": 48,
+        "storage_rebuild": 20,
+        "synthetic_data_generation": 40,
+        "underclocked_long_duration_training": 32
+      }
+    }
+  }
+}
