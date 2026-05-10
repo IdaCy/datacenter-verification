@@ -4,6 +4,8 @@ work in progress.
 
 this repo is for a study on whether rich datacenter telemetry can help detect, rule out, and explain large AI training runs on monitored GPU clusters
 
+[try-out interface](https://idacy.github.io/datacenter-verification/index.html)
+
 basic idea: access to the right internal datacenter data - then a large training run should leave a pattern including several layers;
 
 - enough accelerator capacity to make the run possible
@@ -15,6 +17,23 @@ basic idea: access to the right internal datacenter data - then a large training
 - monitoring coverage strong enough that missing evidence actually means something
 
 we're doing data and modeling pipeline right now
+
+## interactive demo
+
+An unlisted static demo is hosted here:
+
+https://idacy.github.io/datacenter-verification/
+
+It replays the synthetic v0 model outputs and includes a browser-side rule sandbox for changing evidence inputs. Selecting a datapoint shows the trained tabular model's exported prediction for that synthetic window; moving an evidence control switches to the local rule sandbox so the page can respond instantly without server-side model inference. All data shown there is synthetic and fictional.
+
+Regenerate the hosted demo payload from this repo with:
+
+```bash
+python src/datacenter_verification_web/export_static_demo_data.py \
+  --output ../IdaCy.github.io/datacenter-verification/data/demo-data.json
+```
+
+This writes both `demo-data.json` and a local-file-friendly `demo-data.js` payload for the static page.
 
 ## current status
 
