@@ -16,6 +16,23 @@ basic idea: access to the right internal datacenter data - then a large training
 
 we're doing data and modeling pipeline right now
 
+## interactive demo
+
+An unlisted static demo is hosted here:
+
+https://idacy.github.io/datacenter-verification/
+
+It replays the synthetic v0 model outputs and includes a browser-side rule sandbox for changing evidence inputs. All data shown there is synthetic and fictional.
+
+Regenerate the hosted demo payload from this repo with:
+
+```bash
+python src/datacenter_verification_web/export_static_demo_data.py \
+  --output ../IdaCy.github.io/datacenter-verification/data/demo-data.json
+```
+
+This writes both `demo-data.json` and a local-file-friendly `demo-data.js` payload for the static page.
+
 ## current status
 
 this is early. the repo currently contains public scaffolding for:
