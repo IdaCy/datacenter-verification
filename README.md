@@ -4,7 +4,7 @@ work in progress.
 
 this repo is for a study on whether rich datacenter telemetry can help detect, rule out, and explain large AI training runs on monitored GPU clusters
 
-basic idea: if a regulator, auditor, or trusted operator has access to the right internal datacenter data, then a large training run should leave a pattern across several layers at once. not just "the site has many GPUs", and not just "power was high", but a coherent picture:
+basic idea: access to the right internal datacenter data - then a large training run should leave a pattern including several layers;
 
 - enough accelerator capacity to make the run possible
 - a large allocation or reservation lasting long enough to matter
@@ -14,7 +14,7 @@ basic idea: if a regulator, auditor, or trusted operator has access to the right
 - storage, checkpoint, runtime, or ML-log evidence when available
 - monitoring coverage strong enough that missing evidence actually means something
 
-we're doing data and modeling pipeline
+we're doing data and modeling pipeline right now
 
 ## current status
 
@@ -28,7 +28,7 @@ the synthetic generator is still being built. the validator package is present a
 
 private planning notes, paper drafts, and working documents live under `xx_private/`. that directory is intentionally gitignored and is not part of the public repo.
 
-## what one datapoint means
+## what one datapoint means (see more: data/)
 
 the model should not train on one raw telemetry sample.
 
