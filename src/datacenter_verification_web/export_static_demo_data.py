@@ -289,6 +289,70 @@ def compact_feature_frame(row: dict[str, str]) -> dict[str, Any]:
     return features
 
 
+def split_evidence(value: Any) -> list[str]:
+    value = clean_value(value)
+    if value is None:
+        return []
+    return [item.strip() for item in str(value).split(";") if item.strip()]
+
+
+def normalize_top_evidence(value: Any, features: dict[str, Any]) -> str:
+    items = split_evidence(value)
+    gpu_util = as_float(features.get("o4_gpu_util_p95")) or 0.0
+    gpu_duty = as_float(features.get("o4_gpu_util_duty_gt_70")) or 0.0
+    tensor = as_float(features.get("o4_sm_tensor_active_p95")) or 0.0
+    fabric_footprint = as_float(features.get("o7_synchronized_fabric_footprint")) or 0.0
+    fabric_periodicity = as_float(features.get("o7_collective_periodicity_score")) or 0.0
+    fabric_util = as_float(features.get("o7_scaleout_port_util_p95")) or 0.0
+    rack_power = as_float(features.get("o8_rack_power_fraction_p95")) or 0.0
+    checkpoint = as_float(features.get("o11_checkpoint_periodicity_score")) or 0.0
+    signed_logs = as_bool(features.get("o12_signed_ml_logs_present"))
+    runtime = str(clean_value(features.get("o10_runtime_framework_class")) or "")
+    declared_class = str(clean_value(features.get("o2_declared_workload_class")) or "").lower()
+    allocation = as_float(features.get("o2_max_concurrent_normalized_gpus")) or 0.0
+    reserved_without_activity = (
+        (declared_class == "reserved" or as_bool(features.get("o2_reservation_exclusive_flag")))
+        and allocation >= 512
+        and gpu_util < 30
+        and gpu_duty < 0.15
+        and tensor < 20
+        and fabric_footprint < 64
+        and fabric_periodicity < 0.2
+        and fabric_util < 0.25
+        and checkpoint < 0.2
+        and not signed_logs
+    )
+
+    cleaned: list[str] = []
+    for item in items:
+        if item == "high GPU activity" and gpu_util < 70 and gpu_duty < 0.45 and tensor < 60:
+            continue
+        if (
+            item == "synchronized scale-out fabric"
+            and fabric_footprint < 512
+            and fabric_periodicity < 0.6
+            and fabric_util < 0.65
+        ):
+            continue
+        if item == "power corroboration" and rack_power < 0.6:
+            continue
+        if item == "checkpoint cadence" and checkpoint < 0.55:
+            continue
+        if item == "signed ML logs" and not signed_logs:
+            continue
+        if (
+            item == "training runtime metadata"
+            and "training" not in runtime
+            and "fine_tune" not in runtime
+        ):
+            continue
+        cleaned.append(item)
+
+    if reserved_without_activity and "reserved capacity without activity" not in cleaned:
+        cleaned.append("reserved capacity without activity")
+    return "; ".join(cleaned[:8]) if cleaned else "no strong positive evidence"
+
+
 def compact_prediction_frame(prediction: dict[str, str], features: dict[str, str]) -> dict[str, Any]:
     row: dict[str, Any] = {}
     for column in PREDICTION_FIELDS:
@@ -306,6 +370,7 @@ def compact_prediction_frame(prediction: dict[str, str], features: dict[str, str
         for label in range(5)
     ]
     row["features"] = compact_feature_frame(features)
+    row["top_evidence"] = normalize_top_evidence(row["top_evidence"], row["features"])
     return row
 
 

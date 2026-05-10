@@ -22,7 +22,7 @@ An unlisted static demo is hosted here:
 
 https://idacy.github.io/datacenter-verification/
 
-It replays the synthetic v0 model outputs and includes a browser-side rule sandbox for changing evidence inputs. All data shown there is synthetic and fictional.
+It replays the synthetic v0 model outputs and includes a browser-side rule sandbox for changing evidence inputs. Selecting a datapoint shows the trained tabular model's exported prediction for that synthetic window; moving an evidence control switches to the local rule sandbox so the page can respond instantly without server-side model inference. All data shown there is synthetic and fictional.
 
 Regenerate the hosted demo payload from this repo with:
 
