@@ -1,0 +1,84 @@
+{
+  "columns": [
+    "feature_family",
+    "recommended_engineered_features",
+    "ground_truth_labeling_use",
+    "pitfalls_caveats"
+  ],
+  "header_row_number": 1,
+  "row_count": 10,
+  "rows": [
+    {
+      "feature_family": "Capacity gate",
+      "ground_truth_labeling_use": "Determines impossible/possible only; caps labels.",
+      "pitfalls_caveats": "Do not use high capacity as positive activity evidence.",
+      "recommended_engineered_features": "normalized H100e capacity, largest contiguous domain, homogeneity fraction, non-partitioned fraction, power/cooling envelope",
+      "source_row_number": 2
+    },
+    {
+      "feature_family": "Scheduler/allocation",
+      "ground_truth_labeling_use": "Primary activity anchor; best first-pass candidate windows.",
+      "pitfalls_caveats": "Job splitting/account fragmentation can hide true scale.",
+      "recommended_engineered_features": "max concurrent normalized GPUs, linked-job GPU-hours, duration, site/domain fraction, contiguity, declared class",
+      "source_row_number": 3
+    },
+    {
+      "feature_family": "Cloud/billing",
+      "ground_truth_labeling_use": "Primary provisioning/account attribution in cloud settings.",
+      "pitfalls_caveats": "Reservations and high spend can be inference/HPC.",
+      "recommended_engineered_features": "batch launch size, reservation GPU-days, training-SKU fraction, billing CV/diurnal index, account/org aggregation",
+      "source_row_number": 4
+    },
+    {
+      "feature_family": "GPU telemetry",
+      "ground_truth_labeling_use": "Confirms accelerators are actually busy.",
+      "pitfalls_caveats": "High utilization is not semantic; counters may be disabled or spoofed under weak trust.",
+      "recommended_engineered_features": "median/p95 utilization, SM/tensor active, power fraction, HBM used, bandwidth, duty cycle above thresholds",
+      "source_row_number": 5
+    },
+    {
+      "feature_family": "Fabric",
+      "ground_truth_labeling_use": "Strongest non-semantic evidence of one coordinated distributed run.",
+      "pitfalls_caveats": "Large MPI/HPC can mimic; sampling too coarse can miss steps.",
+      "recommended_engineered_features": "synchronized footprint, port p95 utilization, burst duty cycle, autocorrelation period, XmitWait/retry alignment, job-to-port coverage",
+      "source_row_number": 6
+    },
+    {
+      "feature_family": "Power/thermal",
+      "ground_truth_labeling_use": "Hard-to-fake corroboration and negative certification.",
+      "pitfalls_caveats": "Cannot distinguish training from HPC by itself.",
+      "recommended_engineered_features": "rack/facility power fraction, energy, CV/diurnal ratio, thermal delta-T, throttling, power-to-telemetry residual",
+      "source_row_number": 7
+    },
+    {
+      "feature_family": "Storage/checkpoint",
+      "ground_truth_labeling_use": "Supports training-vs-serving and detects fragmentation.",
+      "pitfalls_caveats": "Backups, ETL, and storage rebuilds can mimic large I/O.",
+      "recommended_engineered_features": "pre-run staging bytes, checkpoint size/periodicity, write fan-out, read/write ratio, export/egress after job",
+      "source_row_number": 8
+    },
+    {
+      "feature_family": "Runtime/semantic",
+      "ground_truth_labeling_use": "Disambiguates training vs inference/HPC when authentic.",
+      "pitfalls_caveats": "Highly sensitive; guest isolation can block visibility.",
+      "recommended_engineered_features": "WORLD_SIZE, rank stability, framework class, image hash recurrence, command/env hashes, optimizer/checkpoint libraries",
+      "source_row_number": 9
+    },
+    {
+      "feature_family": "ML logs/declarations",
+      "ground_truth_labeling_use": "Highest semantic ground-truth evidence.",
+      "pitfalls_caveats": "Often unavailable; may need protected escalation and signatures.",
+      "recommended_engineered_features": "signed declared class, parameter count, tokens/examples, step count/time, loss curve, optimizer/checkpoint metadata",
+      "source_row_number": 10
+    },
+    {
+      "feature_family": "Integrity/missingness",
+      "ground_truth_labeling_use": "Controls whether no-run claims and positive evidence are trustworthy.",
+      "pitfalls_caveats": "Integrity anomalies are not training proof unless aligned with activity/physical evidence.",
+      "recommended_engineered_features": "coverage vector, gap fraction, clock drift, counter resets, attestation validity, CC mode, collector hash, physical/firmware events",
+      "source_row_number": 11
+    }
+  ],
+  "sheet_name": "Feature Engineering",
+  "source_workbook": "xx_private/docs/ai_training_run_ground_truth_ranges.xlsx"
+}
