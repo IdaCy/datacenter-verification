@@ -1,0 +1,63 @@
+{
+  "columns": [
+    "window_length",
+    "best_observables",
+    "what_it_can_label_well",
+    "failure_mode",
+    "recommended_use"
+  ],
+  "header_row_number": 1,
+  "row_count": 6,
+  "rows": [
+    {
+      "best_observables": "GPU telemetry, power swings, NVLink/fabric bursts, profiling",
+      "failure_mode": "Too short to establish sustained run; maxima can look like training during benchmarks.",
+      "recommended_use": "Use for feature extraction: p95, bursts, autocorrelation, and periodicity. Do not label likely/definite from a single spike.",
+      "source_row_number": 2,
+      "what_it_can_label_well": "Detects step-level bursts and instantaneous maxima.",
+      "window_length": "1-60 seconds"
+    },
+    {
+      "best_observables": "Cloud launch events, scheduler starts, fabric bursts, GPU utilization",
+      "failure_mode": "Can hit peak utilization without knowing whether the run persisted.",
+      "recommended_use": "Use to assign possible/elevated and to trigger longer-window aggregation.",
+      "source_row_number": 3,
+      "what_it_can_label_well": "Good for candidate-window detection and launch/provisioning clustering.",
+      "window_length": "5-30 minutes"
+    },
+    {
+      "best_observables": "Scheduler allocations, GPU/power utilization, fabric cadence, storage reads/writes",
+      "failure_mode": "May still confuse large benchmarks, HPC, or batch inference.",
+      "recommended_use": "Use for elevated/likely if two independent primary signals align.",
+      "source_row_number": 4,
+      "what_it_can_label_well": "Good for distinguishing sustained jobs from benchmarks or transient autoscaling.",
+      "window_length": "1-6 hours"
+    },
+    {
+      "best_observables": "GPU-hours, billing continuity, power CV, storage checkpoints, runtime stability",
+      "failure_mode": "Short training runs can be diluted if averaged over a full week.",
+      "recommended_use": "Use rolling windows and duration-above-threshold features.",
+      "source_row_number": 5,
+      "what_it_can_label_well": "Good for large fine-tunes, medium pretraining, and sustained training/HPC campaigns.",
+      "window_length": "1-7 days"
+    },
+    {
+      "best_observables": "Billing, scheduler GPU-hours, power continuity, checkpoint/export history",
+      "failure_mode": "Short bursts can be hidden unless max/duty-cycle features are retained.",
+      "recommended_use": "Use for final run classification and aggregate compliance reporting.",
+      "source_row_number": 6,
+      "what_it_can_label_well": "Best for high-confidence large-run labels and negative certification over an audit period.",
+      "window_length": ">7 days to month"
+    },
+    {
+      "best_observables": "Monitoring integrity, attestation, coverage, physical changes",
+      "failure_mode": "Missingness can be mistaken for no activity.",
+      "recommended_use": "Always include coverage and gap features; never impute missing layers as zero.",
+      "source_row_number": 7,
+      "what_it_can_label_well": "Determines whether absence of evidence is meaningful.",
+      "window_length": "Any window"
+    }
+  ],
+  "sheet_name": "Windowing Guide",
+  "source_workbook": "xx_private/docs/ai_training_run_ground_truth_ranges.xlsx"
+}

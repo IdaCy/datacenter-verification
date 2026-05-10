@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "properties": {
+    "created_at": {},
+    "feature_row_hash": {},
+    "model_version": {},
+    "p_label_0": {},
+    "p_label_1": {},
+    "p_label_2": {},
+    "p_label_3": {},
+    "p_label_4": {},
+    "prediction_id": {},
+    "scope_id_hash": {},
+    "scope_type": {},
+    "site_id": {},
+    "window_end": {},
+    "window_start": {}
+  },
+  "required": [
+    "prediction_id",
+    "created_at",
+    "site_id",
+    "scope_type",
+    "scope_id_hash",
+    "window_start",
+    "window_end",
+    "model_version",
+    "p_label_0",
+    "p_label_1",
+    "p_label_2",
+    "p_label_3",
+    "p_label_4",
+    "feature_row_hash"
+  ],
+  "title": "Prediction record",
+  "type": "object"
+}
