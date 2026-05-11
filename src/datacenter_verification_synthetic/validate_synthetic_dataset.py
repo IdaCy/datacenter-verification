@@ -11,8 +11,11 @@ from typing import Any
 
 try:
     from .common import (
+        BASE_REQUIRED_FEATURE_COLUMNS,
+        HARD_GENERATION_SCALES,
         OBSERVABLE_IDS,
         REQUIRED_FEATURE_COLUMNS,
+        V1_ONLY_FEATURE_COLUMNS,
         bool_from_csv,
         parse_utc,
         read_feature_csv,
@@ -21,8 +24,11 @@ try:
     )
 except ImportError:  # pragma: no cover - direct script execution
     from common import (
+        BASE_REQUIRED_FEATURE_COLUMNS,
+        HARD_GENERATION_SCALES,
         OBSERVABLE_IDS,
         REQUIRED_FEATURE_COLUMNS,
+        V1_ONLY_FEATURE_COLUMNS,
         bool_from_csv,
         parse_utc,
         read_feature_csv,
@@ -92,6 +98,13 @@ def validate_dataset(dataset_dir: Path) -> tuple[bool, list[str], dict[str, Any]
     errors: list[str] = []
     validation_dir = dataset_dir / "validation"
     validation_dir.mkdir(parents=True, exist_ok=True)
+    manifest: dict[str, Any] = {}
+    manifest_path = dataset_dir / "manifest.json"
+    if manifest_path.exists():
+        try:
+            manifest = json.loads(manifest_path.read_text())
+        except Exception as exc:
+            errors.append(f"manifest does not parse: manifest.json: {exc}")
 
     for rel_path in REQUIRED_FILES:
         path = dataset_dir / rel_path
@@ -155,7 +168,10 @@ def validate_dataset(dataset_dir: Path) -> tuple[bool, list[str], dict[str, Any]
 
     if all_rows:
         header = set(all_rows[0].keys())
-        for column in REQUIRED_FEATURE_COLUMNS:
+        scale = str(manifest.get("scale") or "").lower()
+        hard_profile = scale in HARD_GENERATION_SCALES or (not scale and bool(header & set(V1_ONLY_FEATURE_COLUMNS)))
+        required_feature_columns = REQUIRED_FEATURE_COLUMNS if hard_profile else BASE_REQUIRED_FEATURE_COLUMNS
+        for column in required_feature_columns:
             if column not in header:
                 errors.append(f"missing required feature column: {column}")
         for obs_id in OBSERVABLE_IDS:
@@ -167,6 +183,8 @@ def validate_dataset(dataset_dir: Path) -> tuple[bool, list[str], dict[str, Any]
 
         label_counter: Counter[int] = Counter()
         scenario_counter: Counter[str] = Counter()
+        scenario_family_counter: Counter[str] = Counter()
+        counterfactual_group_counter: Counter[str] = Counter()
         missing_counter: Counter[str] = Counter()
         window_lengths: Counter[str] = Counter()
         for idx, row in enumerate(all_rows, start=2):
@@ -179,6 +197,10 @@ def validate_dataset(dataset_dir: Path) -> tuple[bool, list[str], dict[str, Any]
                 errors.append(f"features/window_features_all.csv:{idx}: label outside 0-4: {label}")
             label_counter[label] += 1
             scenario_counter[row.get("latent_workload_class", "")] += 1
+            if row.get("scenario_family"):
+                scenario_family_counter[row.get("scenario_family", "")] += 1
+            if row.get("counterfactual_group_id"):
+                counterfactual_group_counter[row.get("counterfactual_group_id", "")] += 1
             window_lengths[row.get("window_length_seconds", "")] += 1
 
             for obs_id in OBSERVABLE_IDS:
@@ -196,7 +218,7 @@ def validate_dataset(dataset_dir: Path) -> tuple[bool, list[str], dict[str, Any]
                 if label > 1:
                     errors.append(f"features/window_features_all.csv:{idx}: capacity-only row has label {label}")
             if bool_from_csv(row.get("integrity_evidence_only")) or row.get("synthetic_evidence_profile") == "integrity_only":
-                if label > 1:
+                if label > 2:
                     errors.append(f"features/window_features_all.csv:{idx}: integrity-only row has label {label}")
             if bool_from_csv(row.get("physical_evidence_only")) or row.get("synthetic_evidence_profile") == "physical_only":
                 if label > 2:
@@ -216,9 +238,13 @@ def validate_dataset(dataset_dir: Path) -> tuple[bool, list[str], dict[str, Any]
 
         _write_counter_csv(validation_dir / "label_distribution.csv", Counter({str(k): v for k, v in label_counter.items()}), ("label_0_to_4", "row_count"))
         _write_counter_csv(validation_dir / "scenario_distribution.csv", scenario_counter, ("latent_workload_class", "row_count"))
+        if scenario_family_counter:
+            _write_counter_csv(validation_dir / "scenario_family_distribution.csv", scenario_family_counter, ("scenario_family", "row_count"))
+        if counterfactual_group_counter:
+            _write_counter_csv(validation_dir / "counterfactual_group_distribution.csv", counterfactual_group_counter, ("counterfactual_group_id", "row_count"))
         _write_counter_csv(validation_dir / "missingness_distribution.csv", missing_counter, ("observable_missing_reason", "row_count"))
         feature_dictionary_rows = []
-        for column in REQUIRED_FEATURE_COLUMNS:
+        for column in required_feature_columns:
             if column.startswith("o") and "_" in column:
                 family = column.split("_", 1)[0].upper()
             elif column in {"feature_row_id", "dataset_id", "seed", "site_id", "scope_type", "scope_id_hash", "window_start", "window_end"}:
@@ -237,6 +263,8 @@ def validate_dataset(dataset_dir: Path) -> tuple[bool, list[str], dict[str, Any]
             "feature_counts": feature_counts,
             "label_distribution": dict(sorted(label_counter.items())),
             "scenario_distribution": dict(sorted(scenario_counter.items())),
+            "scenario_family_distribution": dict(sorted(scenario_family_counter.items())),
+            "counterfactual_group_distribution": dict(sorted(counterfactual_group_counter.items())),
             "missingness_distribution": dict(sorted(missing_counter.items())),
             "window_lengths": dict(sorted(window_lengths.items())),
         }

@@ -10,6 +10,7 @@ from typing import Any
 
 try:
     from .common import (
+        BASE_REQUIRED_FEATURE_COLUMNS,
         FEATURE_PIPELINE_VERSION,
         HARDWARE_NORMALIZATION_VERSION,
         POLICY_THRESHOLD_VERSION,
@@ -27,6 +28,7 @@ try:
     )
 except ImportError:  # pragma: no cover - direct script execution
     from common import (
+        BASE_REQUIRED_FEATURE_COLUMNS,
         FEATURE_PIPELINE_VERSION,
         HARDWARE_NORMALIZATION_VERSION,
         POLICY_THRESHOLD_VERSION,
@@ -81,6 +83,141 @@ def _window_starts(summary: dict[str, Any], length_seconds: int) -> list[Any]:
     return starts
 
 
+def _float_value(value: Any, default: float = 0.0) -> float:
+    if value in {None, ""}:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _scale_numeric(row: dict[str, Any], columns: list[str], factor: float, low: float = 0.0, high: float | None = None) -> None:
+    for column in columns:
+        if row.get(column) in {None, ""}:
+            continue
+        value = _float_value(row[column]) * factor
+        if high is not None:
+            value = min(high, value)
+        row[column] = max(low, value)
+
+
+def _phase_for_v1(summary: dict[str, Any], window_start: Any, length_seconds: int) -> str:
+    start = parse_utc(summary["episode_start"])
+    end = parse_utc(summary["episode_end"])
+    duration_seconds = max(1.0, (end - start).total_seconds())
+    position = max(0.0, min(1.0, (window_start - start).total_seconds() / duration_seconds))
+    family = str(summary.get("scenario_family") or summary.get("latent_workload_class") or "")
+    variant = str(summary.get("scenario_variant") or "")
+    data_quality = str(summary.get("feature_template", {}).get("data_quality_regime") or "")
+    phase_seed = int(stable_hash(summary["episode_id"], utc_iso(window_start), length_seconds, length=8), 16)
+
+    if position < 0.08:
+        return "ramp_up"
+    if position > 0.92:
+        return "cooldown"
+    if data_quality in {"collector_gap_short", "collector_gap_long", "maintenance_observability_loss"} and 0.38 <= position <= 0.62:
+        return "collector_gap"
+    if "preempt" in family or "preempt" in variant or "elastic" in family:
+        if 0.30 <= position <= 0.42:
+            return "restart_or_recovery"
+        if 0.52 <= position <= 0.68:
+            return "scale_resize"
+    if "multi_stage" in family:
+        if 0.18 <= position <= 0.32:
+            return "checkpoint_burst"
+        if 0.68 <= position <= 0.82:
+            return "evaluation_phase"
+    if "delayed_logs" in family and position < 0.55:
+        return "steady_state"
+    if phase_seed % 11 in {0, 1} and length_seconds <= 6 * 60 * 60:
+        return "checkpoint_burst"
+    if phase_seed % 17 == 0 and family in {"pretraining_standard", "large_fine_tune_standard", "sparse_or_moe_bursty_training"}:
+        return "evaluation_phase"
+    return "steady_state"
+
+
+def _apply_v1_window_dynamics(row: dict[str, Any], summary: dict[str, Any], window_start: Any, length_seconds: int) -> None:
+    if not row.get("scenario_family"):
+        return
+    phase = _phase_for_v1(summary, window_start, length_seconds)
+    row["temporal_phase"] = phase
+    family = str(row.get("scenario_family") or "")
+
+    if phase == "ramp_up":
+        _scale_numeric(
+            row,
+            [
+                "o4_gpu_util_p50",
+                "o4_gpu_util_p95",
+                "o4_gpu_util_duty_gt_70",
+                "o4_sm_tensor_active_p95",
+                "o6_nvlink_util_p95",
+                "o7_scaleout_port_util_p95",
+                "o7_collective_periodicity_score",
+                "o8_rack_power_fraction_p95",
+            ],
+            0.68,
+            high=100.0,
+        )
+        row["o7_synchronized_fabric_footprint"] = int(_float_value(row.get("o7_synchronized_fabric_footprint")) * 0.72)
+        _scale_numeric(row, ["o11_checkpoint_periodicity_score", "o11_artifact_write_pattern_score"], 0.35, high=1.0)
+    elif phase == "cooldown":
+        _scale_numeric(
+            row,
+            [
+                "o4_gpu_util_p50",
+                "o4_gpu_util_p95",
+                "o4_gpu_util_duty_gt_70",
+                "o4_sm_tensor_active_p95",
+                "o6_nvlink_util_p95",
+                "o7_scaleout_port_util_p95",
+                "o7_collective_periodicity_score",
+            ],
+            0.52,
+            high=100.0,
+        )
+        row["o7_synchronized_fabric_footprint"] = int(_float_value(row.get("o7_synchronized_fabric_footprint")) * 0.55)
+        _scale_numeric(row, ["o8_rack_power_fraction_p95"], 0.72, high=1.0)
+    elif phase == "checkpoint_burst":
+        row["o11_checkpoint_periodicity_score"] = min(1.0, _float_value(row.get("o11_checkpoint_periodicity_score")) + 0.18)
+        row["o11_artifact_write_pattern_score"] = min(1.0, _float_value(row.get("o11_artifact_write_pattern_score")) + 0.18)
+        row["o11_checkpoint_write_tb_per_event"] = _float_value(row.get("o11_checkpoint_write_tb_per_event")) * 1.35
+        row["o11_storage_cotraffic_score"] = min(1.0, _float_value(row.get("o11_storage_cotraffic_score")) + 0.22)
+        _scale_numeric(row, ["o7_scaleout_port_util_p95", "o7_collective_periodicity_score"], 0.92, high=1.0)
+    elif phase == "evaluation_phase":
+        _scale_numeric(row, ["o4_sm_tensor_active_p95", "o7_collective_periodicity_score", "o6_nvlink_periodicity_score"], 0.70, high=100.0)
+        row["o7_inference_fanout_score"] = min(1.0, _float_value(row.get("o7_inference_fanout_score")) + 0.22)
+        row["o11_artifact_write_pattern_score"] = min(1.0, _float_value(row.get("o11_artifact_write_pattern_score")) + 0.12)
+    elif phase == "restart_or_recovery":
+        _scale_numeric(row, ["o4_gpu_util_p95", "o4_gpu_util_duty_gt_70", "o7_collective_periodicity_score"], 0.58, high=100.0)
+        row["o2_preemption_restart_count"] = int(_float_value(row.get("o2_preemption_restart_count")) + 1)
+        row["o11_checkpoint_jitter_score"] = min(1.0, _float_value(row.get("o11_checkpoint_jitter_score")) + 0.24)
+    elif phase == "scale_resize":
+        row["o2_elastic_resize_count"] = int(_float_value(row.get("o2_elastic_resize_count")) + 1)
+        _scale_numeric(row, ["o2_max_concurrent_normalized_gpus", "o7_synchronized_fabric_footprint"], 0.82)
+        row["o2_gpu_hours_policy_ratio"] = _float_value(row.get("o2_max_concurrent_normalized_gpus")) * _float_value(row.get("o2_allocation_duration_hours")) / (512.0 * 24.0)
+        row["policy_compute_ratio"] = row["o2_gpu_hours_policy_ratio"]
+    elif phase == "collector_gap":
+        for obs in ["o4", "o7", "o8", "o14"]:
+            coverage_col = f"{obs}_coverage_fraction"
+            row[coverage_col] = min(_float_value(row.get(coverage_col), 1.0), 0.62)
+            row[f"{obs}_missing_reason"] = "collector_gap"
+        row["o14_min_critical_coverage"] = min(_float_value(row.get("o14_min_critical_coverage"), 1.0), 0.62)
+        row["o14_gap_fraction_critical"] = max(_float_value(row.get("o14_gap_fraction_critical")), 0.38)
+
+    if length_seconds == 15 * 60:
+        _scale_numeric(row, ["o7_collective_periodicity_score", "o6_nvlink_periodicity_score"], 0.86, high=1.0)
+        row["o7_collective_jitter_score"] = min(1.0, _float_value(row.get("o7_collective_jitter_score")) + 0.08)
+    elif length_seconds >= 24 * 60 * 60 and family in {
+        "underclocked_energy_capped_training",
+        "fragmented_training_linked",
+        "training_without_semantic_logs",
+    }:
+        row["o11_checkpoint_periodicity_score"] = min(1.0, _float_value(row.get("o11_checkpoint_periodicity_score")) + 0.08)
+        row["o7_account_flow_linkage_confidence"] = min(1.0, _float_value(row.get("o7_account_flow_linkage_confidence")) + 0.10)
+
+
 def build_row(summary: dict[str, Any], window_name: str, window_start: Any, length_seconds: int) -> dict[str, Any]:
     template = dict(summary["feature_template"])
     window_end = window_start + timedelta(seconds=length_seconds)
@@ -118,6 +255,7 @@ def build_row(summary: dict[str, Any], window_name: str, window_start: Any, leng
         "policy_threshold_version": POLICY_THRESHOLD_VERSION,
         "hardware_normalization_version": HARDWARE_NORMALIZATION_VERSION,
     }
+    _apply_v1_window_dynamics(row, summary, window_start, length_seconds)
     row["raw_input_manifest_hash"] = raw_payload_hash(
         {
             "episode_id": summary["episode_id"],
@@ -155,16 +293,18 @@ def build_features(raw_dir: Path, output_dir: Path, seed: int | None = None) -> 
 
     counts: dict[str, int] = {}
     all_rows: list[dict[str, Any]] = []
+    hard_profile = any(row.get("scenario_family") for rows in rows_by_window.values() for row in rows)
+    feature_columns = REQUIRED_FEATURE_COLUMNS if hard_profile else BASE_REQUIRED_FEATURE_COLUMNS
     for window_name, rows in rows_by_window.items():
         rows.sort(key=lambda row: (row["window_start"], row["site_id"], row["feature_row_id"]))
         path = output_dir / f"window_features_{window_name}.csv"
-        counts[path.name] = write_csv(path, rows, REQUIRED_FEATURE_COLUMNS)
+        counts[path.name] = write_csv(path, rows, feature_columns)
         optional_write_parquet(path)
         all_rows.extend(rows)
 
     all_rows.sort(key=lambda row: (row["window_start"], row["window_length_seconds"], row["site_id"], row["feature_row_id"]))
     all_path = output_dir / "window_features_all.csv"
-    counts[all_path.name] = write_csv(all_path, all_rows, REQUIRED_FEATURE_COLUMNS)
+    counts[all_path.name] = write_csv(all_path, all_rows, feature_columns)
     optional_write_parquet(all_path)
     return counts
 
@@ -182,4 +322,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
