@@ -1,4 +1,4 @@
-"""Train the calibrated supervised baseline for synthetic v0."""
+"""Train the calibrated supervised baseline for synthetic datacenter verification data."""
 
 from __future__ import annotations
 
@@ -175,7 +175,7 @@ def train_model(features_path: Path, output_dir: Path, seed: int = DEFAULT_SEED,
     write_json(
         output_dir / "manifest.json",
         {
-            "model_run_id": "synthetic_v0_baseline",
+            "model_run_id": output_dir.name,
             "created_or_updated_at": utc_now_iso(),
             "features_path": str(features_path),
             "model_type": "CalibratedClassifierCV over HistGradientBoostingClassifier",

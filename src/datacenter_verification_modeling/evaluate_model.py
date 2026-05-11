@@ -1,4 +1,4 @@
-"""Evaluate a trained synthetic v0 modeling run."""
+"""Evaluate a trained synthetic datacenter verification modeling run."""
 
 from __future__ import annotations
 
@@ -71,6 +71,20 @@ HARD_FALSE_POSITIVE_SCENARIOS = {
     "large_etl_data_movement",
     "reserved_but_unused_capacity",
     "maintenance_window",
+    "large_batch_inference",
+    "model_parallel_inference",
+    "embedding_generation",
+    "synthetic_data_generation_gpu_heavy",
+    "hpc_mpi_collective",
+    "nccl_extended_benchmark",
+    "hardware_burn_in_or_thermal_soak",
+    "storage_rebuild_or_replication",
+    "large_etl_or_data_movement",
+    "distributed_database_or_graph_analytics",
+    "reserved_but_unused_capacity",
+    "maintenance_with_collector_gaps",
+    "multi_tenant_fragmented_nontraining",
+    "capacity_or_integrity_only_warning",
 }
 
 TRAINING_SCENARIOS = {
@@ -79,6 +93,17 @@ TRAINING_SCENARIOS = {
     "cloud_reservation_used_for_training",
     "adversarial_fragmented_training",
     "underclocked_long_duration_training",
+    "pretraining_standard",
+    "large_fine_tune_standard",
+    "cloud_training_redacted_runtime",
+    "training_without_semantic_logs",
+    "underclocked_energy_capped_training",
+    "elastic_preempted_training",
+    "fragmented_training_linked",
+    "sparse_or_moe_bursty_training",
+    "training_with_low_fabric_high_checkpoint",
+    "training_with_delayed_logs",
+    "multi_stage_training_pipeline",
 }
 
 REQUIRED_OUTPUTS = [
@@ -286,6 +311,9 @@ def compute_metrics(test_predictions: pd.DataFrame, test_features: pd.DataFrame)
             column: subgroup_metrics(test_predictions, column)
             for column in [
                 "latent_workload_class",
+                "scenario_family",
+                "data_quality_regime",
+                "temporal_phase",
                 "site_id",
                 "window_length_seconds",
                 "o4_missing_reason",
@@ -443,9 +471,12 @@ def write_run_readme(model_run_dir: Path, features_path: Path, metrics: dict[str
     model_metrics = metrics["model"]
     governance = metrics["governance"]
     split_manifest = read_json(model_run_dir / "split_manifest.json")
-    readme = f"""# synthetic v0 baseline model run
+    dataset_dir = features_path.parent.parent if features_path.parent.name == "features" else features_path.parent
+    dataset_name = dataset_dir.name
+    model_run_name = model_run_dir.name
+    readme = f"""# {model_run_name} model run
 
-This directory contains the first public runnable baseline for the synthetic v0 datacenter training-run verification dataset.
+This directory contains a public runnable baseline for the `{dataset_name}` datacenter training-run verification dataset.
 
 ## Dataset
 
@@ -460,7 +491,7 @@ This directory contains the first public runnable baseline for the synthetic v0 
 - Supervised model: calibrated scikit-learn histogram gradient boosting classifier
 - Calibration: validation split only, held-out test evaluated once
 - Rule baseline: deterministic evidence rules in `src/datacenter_verification_modeling/rule_baseline.py`
-- Leakage exclusions: identifiers, labels, site id, episode id, raw manifest hash, and synthetic-only audit columns
+- Leakage exclusions: identifiers, labels, site id, episode id, raw manifest hash, scenario metadata, counterfactual metadata, and synthetic-only audit columns
 
 ## Headline Test Metrics
 
@@ -488,22 +519,22 @@ This directory contains the first public runnable baseline for the synthetic v0 
 
 ```bash
 python src/datacenter_verification_modeling/train_model.py \\
-  --features data/synthetic_v0/features/window_features_all.csv \\
-  --output data/model_runs/synthetic_v0_baseline \\
-  --seed 20260510
+  --features {features_path} \\
+  --output {model_run_dir} \\
+  --seed {split_manifest['seed']}
 ```
 
 ```bash
 python src/datacenter_verification_modeling/evaluate_model.py \\
-  --model-run data/model_runs/synthetic_v0_baseline \\
-  --features data/synthetic_v0/features/window_features_all.csv
+  --model-run {model_run_dir} \\
+  --features {features_path}
 ```
 
 ```bash
 python src/datacenter_verification_modeling/predict.py \\
-  --model-run data/model_runs/synthetic_v0_baseline \\
-  --features data/synthetic_v0/features/window_features_all.csv \\
-  --output data/model_runs/synthetic_v0_baseline/predictions_all.csv
+  --model-run {model_run_dir} \\
+  --features {features_path} \\
+  --output {model_run_dir / 'predictions_all.csv'}
 ```
 
 ## Limitations
@@ -595,7 +626,7 @@ def write_manifest(
     manifest = {
         **existing,
         "created_or_updated_at": utc_now_iso(),
-        "model_run_id": "synthetic_v0_baseline",
+        "model_run_id": model_run_dir.name,
         "features_path": str(features_path),
         "model_type": "CalibratedClassifierCV over HistGradientBoostingClassifier",
         "calibration_method": existing.get("calibration_method", "sigmoid_on_validation_split"),

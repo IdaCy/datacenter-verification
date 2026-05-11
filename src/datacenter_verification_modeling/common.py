@@ -1,4 +1,4 @@
-"""Shared utilities for the synthetic v0 modeling baseline."""
+"""Shared utilities for synthetic datacenter verification modeling baselines."""
 
 from __future__ import annotations
 
@@ -38,6 +38,17 @@ BASE_EXCLUDED_COLUMNS = [
     "label_source",
     "raw_input_manifest_hash",
     "latent_workload_class",
+    "scenario_family",
+    "scenario_variant",
+    "evidence_recipe_id",
+    "counterfactual_group_id",
+    "synthetic_counterfactual_role",
+    "data_quality_regime",
+    "privacy_tier",
+    "collector_profile",
+    "topology_class",
+    "temporal_phase",
+    "synthetic_hard_case_tags",
     "synthetic_evidence_profile",
     "capacity_evidence_only",
     "integrity_evidence_only",
@@ -85,6 +96,17 @@ SELECTED_AUDIT_FEATURES = [
     "o14_min_critical_coverage",
     "o14_gap_fraction_critical",
     "o13_confidential_compute_mode_fraction",
+    "o2_elastic_resize_count",
+    "o2_preemption_restart_count",
+    "o2_account_linkage_confidence",
+    "o4_hbm_pressure_duration_fraction",
+    "o4_power_cap_active_fraction",
+    "o7_account_flow_linkage_confidence",
+    "o10_runtime_metadata_confidence",
+    "o11_artifact_write_pattern_score",
+    "o11_dataloader_read_pattern_score",
+    "o12_log_delivery_delay_hours",
+    "o12_log_completeness_fraction",
     "o4_missing_reason",
     "o7_missing_reason",
     "o12_missing_reason",
@@ -326,7 +348,7 @@ def determine_feature_columns(df: pd.DataFrame) -> tuple[list[str], dict[str, An
         "notes": [
             "Identifier, label, direct leakage, site, and synthetic-only audit columns are excluded.",
             "scope_type and window_length_seconds are retained because they are valid deployment-time context.",
-            "Constant version metadata columns are excluded from the v0 baseline.",
+            "Constant version metadata columns are excluded from the baseline.",
         ],
     }
     return feature_columns, metadata
@@ -559,6 +581,11 @@ def build_prediction_frame(
         "window_end",
         "window_length_seconds",
         "latent_workload_class",
+        "scenario_family",
+        "scenario_variant",
+        "data_quality_regime",
+        "counterfactual_group_id",
+        "synthetic_hard_case_tags",
         "label_0_to_4",
     ]
     present_base_columns = [column for column in base_columns if column in df.columns]
@@ -582,4 +609,3 @@ def build_prediction_frame(
         if column in df.columns and column not in out.columns:
             out[column] = df[column].to_numpy()
     return out
-
