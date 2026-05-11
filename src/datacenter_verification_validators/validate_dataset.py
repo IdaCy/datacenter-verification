@@ -29,12 +29,22 @@ LABEL_TARGETS = {
     4: (0.01, 0.08),
 }
 
+V1_LABEL_TARGETS = {
+    0: (0.25, 0.40),
+    1: (0.15, 0.25),
+    2: (0.20, 0.35),
+    3: (0.12, 0.22),
+    4: (0.04, 0.10),
+}
+
 SCALE_MINIMA = {
     "smoke": {"sites": 1, "episodes": 30},
     "v0": {"sites": 3, "episodes": 180},
     "study": {"sites": 8, "episodes": 1500},
     "stress": {"sites": 20, "episodes": 10000},
 }
+
+SCALE_MINIMA["v1"] = {"sites": 6, "episodes": 600}
 
 REQUIRED_SCENARIOS = {
     "idle",
@@ -67,6 +77,53 @@ HARD_FALSE_POSITIVE_SCENARIOS = {
     "large_etl_data_movement",
     "reserved_but_unused_capacity",
     "maintenance_window",
+}
+
+V1_REQUIRED_SCENARIO_FAMILIES = {
+    "pretraining_standard",
+    "large_fine_tune_standard",
+    "cloud_training_redacted_runtime",
+    "training_without_semantic_logs",
+    "underclocked_energy_capped_training",
+    "elastic_preempted_training",
+    "fragmented_training_linked",
+    "sparse_or_moe_bursty_training",
+    "training_with_low_fabric_high_checkpoint",
+    "training_with_delayed_logs",
+    "multi_stage_training_pipeline",
+    "idle_or_low_activity",
+    "normal_inference",
+    "large_batch_inference",
+    "model_parallel_inference",
+    "embedding_generation",
+    "synthetic_data_generation_gpu_heavy",
+    "hpc_mpi_collective",
+    "nccl_extended_benchmark",
+    "hardware_burn_in_or_thermal_soak",
+    "storage_rebuild_or_replication",
+    "large_etl_or_data_movement",
+    "distributed_database_or_graph_analytics",
+    "reserved_but_unused_capacity",
+    "maintenance_with_collector_gaps",
+    "multi_tenant_fragmented_nontraining",
+    "counter_suppressed_candidate_window",
+    "capacity_or_integrity_only_warning",
+}
+
+V1_HARD_FALSE_POSITIVE_FAMILIES = {
+    "large_batch_inference",
+    "model_parallel_inference",
+    "embedding_generation",
+    "synthetic_data_generation_gpu_heavy",
+    "hpc_mpi_collective",
+    "nccl_extended_benchmark",
+    "hardware_burn_in_or_thermal_soak",
+    "storage_rebuild_or_replication",
+    "large_etl_or_data_movement",
+    "distributed_database_or_graph_analytics",
+    "reserved_but_unused_capacity",
+    "maintenance_with_collector_gaps",
+    "multi_tenant_fragmented_nontraining",
 }
 
 TRAINING_SCENARIOS = {
@@ -339,14 +396,33 @@ def offledger_warning(row: dict[str, str]) -> bool:
 
 
 def allocation_signal(row: dict[str, str]) -> bool:
+    is_v1 = bool(row.get("scenario_family"))
     return any(
         [
             (as_float(row, "o2_max_concurrent_normalized_gpus", 0.0) or 0.0) >= 512,
+            is_v1 and (as_float(row, "o2_max_concurrent_normalized_gpus", 0.0) or 0.0) >= 64,
             (as_float(row, "o2_gpu_hours_policy_ratio", 0.0) or 0.0) >= 0.75,
+            is_v1 and (as_float(row, "o2_gpu_hours_policy_ratio", 0.0) or 0.0) >= 0.25,
             (as_float(row, "o2_concurrency_fraction_domain", 0.0) or 0.0) >= 0.5,
             (as_float(row, "o3_batch_provisioned_gpus", 0.0) or 0.0) >= 512,
         ]
     )
+
+
+def benign_nontraining_explanation(row: dict[str, str]) -> bool:
+    runtime = str(row.get("o10_runtime_framework_class", "")).lower()
+    declared = str(row.get("o2_declared_workload_class", "")).lower()
+    return any(
+        token in runtime for token in ["inference", "embedding", "synthetic_data", "etl", "database", "graph", "storage", "burn_in"]
+    ) or declared in {
+        "inference",
+        "embedding",
+        "synthetic_data",
+        "data",
+        "database",
+        "reserved",
+        "burn_in",
+    }
 
 
 def gpu_signal(row: dict[str, str]) -> bool:
@@ -658,7 +734,8 @@ class DatasetValidator:
     def validate_distributions_and_occurrences(self) -> None:
         rows = self.state.feature_rows
         labels = Counter(label(row) for row in rows)
-        scenarios = Counter(row.get("latent_workload_class", "") for row in rows)
+        scenario_column = "scenario_family" if "scenario_family" in self.state.feature_columns else "latent_workload_class"
+        scenarios = Counter(row.get(scenario_column, "") or row.get("latent_workload_class", "") for row in rows)
         sites = {row.get("site_id") for row in rows if row.get("site_id")}
         episodes = {row.get("episode_id") for row in rows if row.get("episode_id")}
 
@@ -683,7 +760,8 @@ class DatasetValidator:
             severity = self.state.error if len(rows) >= 1000 else self.state.warn
             severity("labels_missing", "Dataset does not contain examples of every label 0-4", missing_labels)
 
-        for lab, (low, high) in LABEL_TARGETS.items():
+        targets = V1_LABEL_TARGETS if scale == "v1" else LABEL_TARGETS
+        for lab, (low, high) in targets.items():
             ratio = labels.get(lab, 0) / max(len(rows), 1)
             if ratio < low or ratio > high:
                 self.state.warn(
@@ -691,11 +769,13 @@ class DatasetValidator:
                     f"Label {lab} ratio {ratio:.3f} is outside target {low:.2f}-{high:.2f}",
                 )
 
-        missing_scenarios = sorted(REQUIRED_SCENARIOS - set(scenarios))
+        required_scenarios = V1_REQUIRED_SCENARIO_FAMILIES if scale == "v1" else REQUIRED_SCENARIOS
+        missing_scenarios = sorted(required_scenarios - set(scenarios))
         if missing_scenarios:
-            self.state.warn("scenario_classes_missing", "Not every required latent scenario class is represented", missing_scenarios)
+            self.state.warn("scenario_classes_missing", "Not every required scenario family/class is represented", missing_scenarios)
 
-        represented_false_positives = HARD_FALSE_POSITIVE_SCENARIOS & set(scenarios)
+        false_positive_required = V1_HARD_FALSE_POSITIVE_FAMILIES if scale == "v1" else HARD_FALSE_POSITIVE_SCENARIOS
+        represented_false_positives = false_positive_required & set(scenarios)
         if len(represented_false_positives) < 5:
             self.state.error(
                 "hard_false_positives_insufficient",
@@ -730,7 +810,8 @@ class DatasetValidator:
             if lab == 0 and cap and coverage < 0.80:
                 errors["label0_low_coverage"].append(f"{rid}: label 0 with coverage={coverage:.2f}")
 
-            if lab == 0 and cap and (alloc or gpu or fabric or power or semantic or storage):
+            material_power = power and num(row, "o8_rack_power_fraction_p95", 0.0) >= 0.45
+            if lab == 0 and cap and (alloc or gpu or fabric or material_power or semantic or storage) and not benign_nontraining_explanation(row):
                 errors["label0_activity_present"].append(f"{rid}: label 0 despite activity/supportive signal")
 
             if cap and not (alloc or gpu or fabric or power or semantic or storage or integ) and lab > 1:
