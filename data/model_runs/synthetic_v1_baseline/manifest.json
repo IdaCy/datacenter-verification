@@ -1,0 +1,127 @@
+{
+  "artifact_hashes": {
+    "README.md": "sha256:e1cca94649d1dd9f08cf2b1a772737fbd7362e3d24f0e5f49567f79fdced1130",
+    "calibration_metrics.json": "sha256:a1b673af40faa3ed6b614b7e3cf3753964ede2e3810bcd5354d6657153577897",
+    "classification_report.json": "sha256:c74bb9ef28966c94937dd3ddb30296937b8bca224dd8f6fcf781d680621eab0c",
+    "confusion_matrix.csv": "sha256:265fa42852a745220b1ea17ee8f502c1b5a24f74063a60f7de9acdd154a830af",
+    "evidence_audit_sample.csv": "sha256:a9efe77b1ccc902b0a8f28b2b8b0cb72c9524e39f0d21676b27bb20ec3ce683d",
+    "excluded_columns.json": "sha256:0811708d16c4a2b8444eb8324b378ea61cc7ad30931adc14312f2a62587c182b",
+    "feature_columns.json": "sha256:f8c411ac97a84df3e13f37163bfa210c2a4019208678b77d5131cb5579f3f976",
+    "feature_importance.csv": "sha256:96cb96808c2b5ad9e7a23ba08fc485ddb5e026eddbc54ffa8496e7bb8635c095",
+    "metrics.json": "sha256:d7d459e44ed94014a33fb39fbffca89deb69d40ec38658ffa703f009a511a317",
+    "model.joblib": "sha256:06c701b0d9c74cdfd0066fe3212013ad2393c3eca34ca625c78792631fa3f338",
+    "predictions_all.csv": "sha256:e2e66b8c5f743d13bb4a24b57656cf7f246cb423071efc1049a9f11019e8f549",
+    "predictions_test.csv": "sha256:e4fb8e249d438455967b6ff491d51e3db243002c326fe2f66c023f134c5160e1",
+    "preprocessing.joblib": "sha256:edf78f71a10335c7703a183a76b97add8ee6ecc8b0ca1068fdcdedab18bcf2de",
+    "split_manifest.json": "sha256:4ab606273d10f182b02a5154982a7943c0837b6e5725dee907c97c25e2daff92",
+    "validation_summary.md": "sha256:d3da3e62f5e957260990001209805854976b3b2dfe56b921104077a6395918c3"
+  },
+  "calibration_method": "sigmoid_on_validation_split_frozen_estimator",
+  "created_or_updated_at": "2026-05-11T00:23:31Z",
+  "features_path": "data/synthetic_v1/features/window_features_all.csv",
+  "limitations": [
+    "Trained on synthetic data only.",
+    "Performance numbers are not real-world deployment claims.",
+    "Episode-level group splitting is required because adjacent windows are correlated.",
+    "Synthetic labels encode generator assumptions.",
+    "Real deployment requires real telemetry calibration and controlled drills."
+  ],
+  "metrics_summary": {
+    "accuracy": 0.9724612736660929,
+    "brier_large_training": 0.001846207706971921,
+    "ece_large_training": 0.010488907264903001,
+    "label_3_4_precision": 0.993517017828201,
+    "label_3_4_recall": 0.9967479674796748,
+    "macro_f1": 0.9781141424575879,
+    "p_large_training_precision_at_0_5": 0.993517017828201,
+    "p_large_training_recall_at_0_5": 0.9967479674796748,
+    "weighted_f1": 0.9722899614011162
+  },
+  "model_run_id": "synthetic_v1_baseline",
+  "model_type": "CalibratedClassifierCV over HistGradientBoostingClassifier",
+  "required_outputs": [
+    "README.md",
+    "manifest.json",
+    "model.joblib",
+    "preprocessing.joblib",
+    "feature_columns.json",
+    "excluded_columns.json",
+    "split_manifest.json",
+    "metrics.json",
+    "calibration_metrics.json",
+    "confusion_matrix.csv",
+    "classification_report.json",
+    "predictions_test.csv",
+    "predictions_all.csv",
+    "feature_importance.csv",
+    "evidence_audit_sample.csv",
+    "validation_summary.md"
+  ],
+  "training_metadata": {
+    "calibration_method": "sigmoid_on_validation_split_frozen_estimator",
+    "dataset_validation_status": [
+      {
+        "command": "/Users/ifc24/miniforge3/bin/python /Users/ifc24/Develop/datacenter-verification/src/datacenter_verification_synthetic/validate_synthetic_dataset.py --dataset data/synthetic_v1",
+        "name": "synthetic_dataset_validator",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "PASS\nraw_records: 152457\nfeature_rows: 14712\nlabel_distribution: {0: 3861, 1: 3333, 2: 4203, 3: 2489, 4: 826}"
+      },
+      {
+        "command": "/Users/ifc24/miniforge3/bin/python -m src.datacenter_verification_validators --dataset data/synthetic_v1",
+        "name": "public_dataset_validator",
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "Validated dataset: data/synthetic_v1\nErrors: 0\nWarnings: 0\nReport: data/synthetic_v1/validation/validation_report.md"
+      }
+    ],
+    "feature_count": 152,
+    "features_path": "data/synthetic_v1/features/window_features_all.csv",
+    "model_parameters": {
+      "categorical_features": "from_dtype",
+      "class_weight": "balanced",
+      "early_stopping": true,
+      "interaction_cst": null,
+      "l2_regularization": 0.03,
+      "learning_rate": 0.05,
+      "loss": "log_loss",
+      "max_bins": 255,
+      "max_depth": null,
+      "max_features": 1.0,
+      "max_iter": 350,
+      "max_leaf_nodes": 31,
+      "min_samples_leaf": 20,
+      "monotonic_cst": null,
+      "n_iter_no_change": 10,
+      "random_state": 20260510,
+      "scoring": "loss",
+      "tol": 1e-07,
+      "validation_fraction": 0.15,
+      "verbose": 0,
+      "warm_start": false
+    },
+    "model_type": "HistGradientBoostingClassifier",
+    "seed": 20260510,
+    "train_episodes": 458,
+    "train_rows": 8870,
+    "trained_at": "2026-05-11T00:21:12Z",
+    "validation_episodes": 152,
+    "validation_rows": 2937
+  },
+  "validation_status": [
+    {
+      "command": "/Users/ifc24/miniforge3/bin/python /Users/ifc24/Develop/datacenter-verification/src/datacenter_verification_synthetic/validate_synthetic_dataset.py --dataset data/synthetic_v1",
+      "name": "synthetic_dataset_validator",
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "PASS\nraw_records: 152457\nfeature_rows: 14712\nlabel_distribution: {0: 3861, 1: 3333, 2: 4203, 3: 2489, 4: 826}"
+    },
+    {
+      "command": "/Users/ifc24/miniforge3/bin/python -m src.datacenter_verification_validators --dataset data/synthetic_v1",
+      "name": "public_dataset_validator",
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "Validated dataset: data/synthetic_v1\nErrors: 0\nWarnings: 0\nReport: data/synthetic_v1/validation/validation_report.md"
+    }
+  ]
+}
