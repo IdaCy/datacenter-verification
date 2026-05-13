@@ -89,48 +89,23 @@ Table 1. Datacenter observables used in the framework.
 
 | Observable name | Importance | Example features |
 |---|---|---|
-| Hardware inventory and accelerator capacity | Capacity gate; negative-certification prerequisite | Accelerator count, GPU/
-accelerator SKU, normalized training compute capacity, largest low-latency topology domain, partitioning/MIG/vGPU fraction,
-inventory delta rate |
-| Scheduler, job, reservation, and allocation metadata | Primary detection signal; attribution signal | Allocated accelerator
-count, allocation duration, GPU-hours, concurrency fraction, topology contiguity, declared workload class, account/job
-linkage, reservation and preemption pattern |
-| Cloud control-plane, reservation, and billing records | Primary detection signal for cloud settings; attribution signal |
-Batch provisioning size, instance type, capacity reservation duration, billing continuity, region/AZ/placement group, account
-or organization linkage, egress/inter-region movement |
-| On-device GPU telemetry | Primary activity signal | GPU utilization, SM or tensor-core activity, HBM memory used, HBM
-bandwidth, GPU power draw, per-process accounting, GPU health/error counts |
-| GPU profiling and kernel/counter telemetry | Strong but often unavailable activity signal; workload-shape evidence | Kernel
-family or hashed kernel sequence, achieved tensor-throughput ratio, profiler availability state |
-| Intra-node GPU fabric telemetry | Primary/supporting activity signal for local parallelism | NVLink/NVSwitch utilization,
-local fabric periodicity, local link error or recovery events |
-| Scale-out network/fabric telemetry | Primary detection signal for distributed training; fragmentation and attribution signal
-| Scale-out port utilization, synchronized fabric footprint, collective periodicity or step cadence, RDMA congestion/retry/
-drops, job-to-port mapping coverage |
-| Rack/server/facility power and energy telemetry | Secondary support; physical consistency check; discrepancy detection | Rack IT
-power, facility IT power, power continuity, power-to-telemetry consistency, baseline-subtracted energy |
-| Cooling and thermal telemetry | Secondary support; physical plausibility check | GPU/HBM temperature, liquid-cooling delta-
-T, cooling flow or fan speed, thermal-throttle support |
-| Host, VM, container, process, and distributed-runtime metadata | Attribution and workload-type evidence; escalation evidence |
-Distributed world size/rank count, runtime framework class, rendezvous/rank mapping stability, container or VM image digest
-recurrence |
-| Storage, object-store, filesystem, and data-movement logs | Supporting activity and workload-type evidence | Initial data staging
-volume, checkpoint write size, checkpoint period, read/write operation pattern, artifact export pattern |
-| Workload declarations, experiment trackers, and ML training logs | Strong workload-type evidence when authenticated; highest-
-warning support | Declared model parameter count, training tokens/examples, step count and step time, loss curves, optimizer
-state, checkpoint metadata, log completeness |
-| Attestation, trusted computing, and telemetry provenance | Trust/integrity evidence; attempted evasion detection |
-Attestation validity, confidential-compute mode, telemetry collector measurement, device or collector signatures |
-| Monitoring-pipeline integrity, coverage, and time synchronization | Negative-certification foundation; attempted evasion
-detection | Telemetry coverage fraction by layer, missed scrapes, clock drift, counter resets, collector config changes |
-| Physical security, maintenance, and change-management records | Integrity support; attempted evasion and benign-explanation
-evidence | Rack-door or badge events, maintenance tickets, firmware/BMC changes, approved physical changes, hardware
-replacement records |
-| Active challenge probes and weak-trust telemetry tests | Auxiliary attempted evasion detection under weak trust | Probe
-throughput ratio, probe latency inflation, VRAM residency/free-memory test |
-| External and out-of-band evidence | Capacity discovery and checking against other records; weak activity evidence | External IT power
-estimate, construction or commissioning timeline, chip shipment/procurement indicators, public disclosures, permit or utility
-evidence |
+| Hardware inventory and accelerator capacity | Capacity gate; negative-certification prerequisite | Accelerator count, GPU/accelerator SKU, normalized training compute capacity, largest low-latency topology domain, partitioning/MIG/vGPU fraction, inventory delta rate |
+| Scheduler, job, reservation, and allocation metadata | Primary detection signal; attribution signal | Allocated accelerator count, allocation duration, GPU-hours, concurrency fraction, topology contiguity, declared workload class, account/job linkage, reservation and preemption pattern |
+| Cloud control-plane, reservation, and billing records | Primary detection signal for cloud settings; attribution signal | Batch provisioning size, instance type, capacity reservation duration, billing continuity, region/AZ/placement group, account or organization linkage, egress/inter-region movement |
+| On-device GPU telemetry | Primary activity signal | GPU utilization, SM or tensor-core activity, HBM memory used, HBM bandwidth, GPU power draw, per-process accounting, GPU health/error counts |
+| GPU profiling and kernel/counter telemetry | Strong but often unavailable activity signal; workload-shape evidence | Kernel family or hashed kernel sequence, achieved tensor-throughput ratio, profiler availability state |
+| Intra-node GPU fabric telemetry | Primary/supporting activity signal for local parallelism | NVLink/NVSwitch utilization, local fabric periodicity, local link error or recovery events |
+| Scale-out network/fabric telemetry | Primary detection signal for distributed training; fragmentation and attribution signal | Scale-out port utilization, synchronized fabric footprint, collective periodicity or step cadence, RDMA congestion/retry/drops, job-to-port mapping coverage |
+| Rack/server/facility power and energy telemetry | Secondary support; physical consistency check; discrepancy detection | Rack IT power, facility IT power, power continuity, power-to-telemetry consistency, baseline-subtracted energy |
+| Cooling and thermal telemetry | Secondary support; physical plausibility check | GPU/HBM temperature, liquid-cooling delta-T, cooling flow or fan speed, thermal-throttle support |
+| Host, VM, container, process, and distributed-runtime metadata | Attribution and workload-type evidence; escalation evidence | Distributed world size/rank count, runtime framework class, rendezvous/rank mapping stability, container or VM image digest recurrence |
+| Storage, object-store, filesystem, and data-movement logs | Supporting activity and workload-type evidence | Initial data staging volume, checkpoint write size, checkpoint period, read/write operation pattern, artifact export pattern |
+| Workload declarations, experiment trackers, and ML training logs | Strong workload-type evidence when authenticated; highest-warning support | Declared model parameter count, training tokens/examples, step count and step time, loss curves, optimizer state, checkpoint metadata, log completeness |
+| Attestation, trusted computing, and telemetry provenance | Trust/integrity evidence; attempted evasion detection | Attestation validity, confidential-compute mode, telemetry collector measurement, device or collector signatures |
+| Monitoring-pipeline integrity, coverage, and time synchronization | Negative-certification foundation; attempted evasion detection | Telemetry coverage fraction by layer, missed scrapes, clock drift, counter resets, collector config changes |
+| Physical security, maintenance, and change-management records | Integrity support; attempted evasion and benign-explanation evidence | Rack-door or badge events, maintenance tickets, firmware/BMC changes, approved physical changes, hardware replacement records |
+| Active challenge probes and weak-trust telemetry tests | Auxiliary attempted evasion detection under weak trust | Probe throughput ratio, probe latency inflation, VRAM residency/free-memory test |
+| External and out-of-band evidence | Capacity discovery and checking against other records; weak activity evidence | External IT power estimate, construction or commissioning timeline, chip shipment/procurement indicators, public disclosures, permit or utility evidence |
 
 First we identified how useful each data source is for determining the presence of training runs. The primary observables for detecting candidate large training runs are scale-out fabric telemetry, scheduler/allocation metadata, cloud provisioning or reservation records where relevant, GPU telemetry, and runtime or ML-log evidence where available. They can either show large compute allocation, actual accelerator activity, distributed synchronization, or workload purpose: what kind of workload was running.
 
