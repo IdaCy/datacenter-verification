@@ -1,0 +1,133 @@
+catalog_id: discrepancy_evasion_rules.v2
+created: "2026-05-12"
+status: explicit_anomaly_and_evasion_hypotheses
+purpose: >
+  First-class discrepancy rules. These rules do not directly prove training; they
+  identify when the feature relationships are inconsistent enough to require
+  escalation, explanation, or different label caps.
+
+rule_schema:
+  trigger: condition that activates the discrepancy rule
+  required_coverage: evidence coverage required before treating the discrepancy seriously
+  benign_explanations: plausible non-evasion explanations
+  evasion_hypotheses: possible concealment/manipulation hypotheses
+  severity: low | medium | high
+  label_effect: how this affects labels or confidence
+
+rules:
+  - id: discrepancy_allocation_zero_but_activity_high
+    trigger: o2_allocated_accelerator_count or o2_allocation_duration is zero/near-zero while O4/O7/O8 activity is high in the mapped domain.
+    required_coverage: scheduler, GPU, fabric, power, and mapping coverage must be known.
+    benign_explanations: [scheduler blind spot, job-account linkage error, manual workload, non-GPU power load, stale mapping]
+    evasion_hypotheses: [off-scheduler run, falsified scheduler records, hidden tenant/job identity]
+    severity: high
+    label_effect: Never label no-training solely from zero allocation; raise integrity/evasion review and rely on independent activity layers.
+    source_refs: [excel_workbook, slurm_sacct, nvidia_smi, nvidia_ufm_telemetry]
+
+  - id: discrepancy_power_high_visible_telemetry_low
+    trigger: Rack/facility power is materially elevated while visible GPU/fabric telemetry is low and coverage claims are strong.
+    required_coverage: power meter mapping, GPU/fabric telemetry coverage, and baseline model must be available.
+    benign_explanations: [non-GPU IT load, meter mapping error, baseline drift, cooling/power test, storage/network equipment load]
+    evasion_hypotheses: [suppressed GPU counters, unmonitored accelerators, hidden workload under confidential or modified telemetry path]
+    severity: high
+    label_effect: Raise discrepancy; cap no-run confidence until reconciled.
+    source_refs: [excel_workbook, nvidia_dcgm_exporter, nvidia_smi]
+
+  - id: discrepancy_fabric_high_scheduler_low
+    trigger: Scale-out fabric shows broad periodic synchronized traffic while scheduler allocation/account linkage is low or absent.
+    required_coverage: fabric counters, job-to-port mapping status, scheduler coverage, and clock alignment.
+    benign_explanations: [HPC/MPI, NCCL benchmark, storage replication, missing job-port mapping, cross-cluster federation]
+    evasion_hypotheses: [off-scheduler distributed run, hidden account linkage, falsified scheduler records]
+    severity: high
+    label_effect: Elevate to candidate window; require runtime/storage/semantic disambiguation.
+    source_refs: [excel_workbook, nvidia_ufm_telemetry, nvidia_ib_port_counters, slurm_sacct]
+
+  - id: discrepancy_cloud_scheduler_mismatch
+    trigger: Cloud provisioning/reservation/billing mass is high but scheduler/runtime/GPU activity is absent or much lower in the linked account/time window.
+    required_coverage: cloud control-plane logs, billing exports, account linkage, and scheduler/runtime coverage.
+    benign_explanations: [unused reservation, billing delay, account aggregation mismatch, provider abstraction, failed launch]
+    evasion_hypotheses: [concealed scheduler layer, unlinked account, activity moved outside monitored boundary]
+    severity: medium
+    label_effect: Treat as provisioning discrepancy, not training proof; request reconciliation.
+    source_refs: [excel_workbook, aws_ec2_cloudtrail, aws_cur, aws_ec2_capacity_blocks]
+
+  - id: discrepancy_counts_exceed_capacity
+    trigger: Allocation, provisioning, fabric-footprint, or world-size counts exceed monitored usable capacity/domain.
+    required_coverage: inventory/topology, scheduler/cloud/runtime/fabric counts, and scope definition.
+    benign_explanations: [wrong denominator, federation, CPU ranks included, multi-process-per-GPU, stale inventory]
+    evasion_hypotheses: [off-ledger capacity, undeclared hardware, hidden provider pool]
+    severity: high
+    label_effect: Raise consistency/inventory discrepancy; do not silently train model on impossible rows.
+    source_refs: [excel_workbook, slurm_sacct, pytorch_distributed]
+
+  - id: discrepancy_critical_telemetry_gap_during_candidate_window
+    trigger: GPU/fabric/power/scheduler coverage drops or missed scrapes spike during high-capacity or high-activity windows.
+    required_coverage: collector health logs, gap timing, maintenance/change records.
+    benign_explanations: [planned maintenance, collector upgrade, network outage, counter wrap/reset]
+    evasion_hypotheses: [selective telemetry suppression, collector tampering, time-shifted logs]
+    severity: high
+    label_effect: Cap negative certification and raise integrity warning if aligned with activity.
+    source_refs: [excel_workbook, nvidia_dcgm_exporter, nvidia_ufm_telemetry]
+
+  - id: discrepancy_counter_reset_or_config_change_near_activity
+    trigger: Counter resets or collector config changes occur near high allocation, high power, or high fabric windows.
+    required_coverage: reset/config logs, activity evidence, change approval context.
+    benign_explanations: [planned restart, firmware update, collector deployment, natural counter wrap]
+    evasion_hypotheses: [counter clearing, telemetry manipulation, post-hoc log alteration]
+    severity: medium
+    label_effect: Reduce trust and require change-management explanation.
+    source_refs: [excel_workbook, nvidia_dcgm_exporter, nvidia_ufm_telemetry]
+
+  - id: discrepancy_confidential_compute_unexplained_counter_absence
+    trigger: Performance counters/profilers disappear during candidate windows without declared confidential-compute/security mode or policy explanation.
+    required_coverage: CC/security mode, profiler availability state, collector measurement, activity layers.
+    benign_explanations: [security policy, driver issue, permission change, planned CC mode]
+    evasion_hypotheses: [counter suppression, unauthorized CC/config change, concealed profiler blocking]
+    severity: medium
+    label_effect: Treat missing counters as unknown; escalate if physical/power/fabric activity is high.
+    source_refs: [excel_workbook, nvidia_h100_confidential_computing, nvidia_dcgm_exporter]
+
+  - id: discrepancy_semantic_declaration_conflicts_with_activity
+    trigger: Declared workload class says inference/HPC/data/unknown while O2/O4/O7/O11/O12 patterns support training.
+    required_coverage: declaration authenticity, scheduler/runtime linkage, activity and storage windows.
+    benign_explanations: [wrong class, mixed workload, evaluation/fine-tuning boundary, benchmark]
+    evasion_hypotheses: [misclassification to avoid reporting, split declaration, fabricated workload metadata]
+    severity: medium
+    label_effect: Raise attribution dispute; require semantic audit before highest label.
+    source_refs: [excel_workbook, pytorch_distributed, mlflow_tracking]
+
+  - id: discrepancy_checkpoint_without_training_context
+    trigger: Large periodic checkpoint-like writes occur without matching runtime/training logs/declaration, while compute/fabric are high.
+    required_coverage: storage logs, runtime/log availability, scheduler window, backup/replication context.
+    benign_explanations: [backup, replication, ETL, model export, storage rebuild]
+    evasion_hypotheses: [training logs withheld, path hashing too coarse, off-platform tracker]
+    severity: medium
+    label_effect: Support candidate training only with cross-layer alignment; otherwise mark storage ambiguity.
+    source_refs: [excel_workbook, aws_s3_server_access_logging, pytorch_distributed_checkpoint]
+
+  - id: discrepancy_external_capacity_conflict
+    trigger: External power/procurement/commissioning evidence materially conflicts with declared inventory or monitored capacity.
+    required_coverage: source confidence, date alignment, inventory records, uncertainty bounds.
+    benign_explanations: [public estimate error, uncommissioned capacity, non-AI load, leased/cloud capacity, timing lag]
+    evasion_hypotheses: [undeclared capacity, off-ledger cluster, hidden expansion]
+    severity: medium
+    label_effect: Capacity-discovery escalation only; no active-training label without activity evidence.
+    source_refs: [excel_workbook, epoch_frontier_datacenters]
+
+  - id: discrepancy_active_probe_hidden_load
+    trigger: Active probes show low throughput, high latency, or low free VRAM during claimed idle or low passive telemetry.
+    required_coverage: calibrated expected probe result, randomized timing, safety policy, repeated measurements.
+    benign_explanations: [legitimate background load, power cap, thermal throttle, noisy neighbors, probe calibration error]
+    evasion_hypotheses: [hidden workload under weak trust, suppressed passive telemetry, resident hidden memory]
+    severity: medium
+    label_effect: Weak-trust suspicion; require corroborating physical/activity evidence before likely-training labels.
+    source_refs: [excel_workbook, timing_memory_telemetry_gpu_governance]
+
+  - id: discrepancy_physical_or_firmware_change_near_gap
+    trigger: Physical access, maintenance, firmware, or BMC change coincides with telemetry gaps, inventory deltas, or candidate activity.
+    required_coverage: physical/change logs, approval status, telemetry gaps, candidate evidence.
+    benign_explanations: [approved maintenance, RMA, scheduled firmware update, sensor replacement]
+    evasion_hypotheses: [hardware swap, sensor disabling, firmware-level telemetry manipulation]
+    severity: medium
+    label_effect: Integrity escalation and trust reduction; not training proof by itself.
+    source_refs: [excel_workbook, nvidia_h100_confidential_computing]
