@@ -1,0 +1,156 @@
+catalog_id: conditional_plausibility_windows.v2
+created: "2026-05-12"
+status: regime_based_realistic_range_rules
+purpose: >
+  Encodes cross-feature possibility windows: if one feature/regime has a given value,
+  what ranges or states are expected for related features, and what violations mean.
+  These are not universal physical laws; they are source-backed regimes with confidence.
+
+window_schema:
+  condition: feature regime being evaluated
+  expected_related_window: plausible range/state for related features
+  violation_interpretation: what an out-of-window value could mean
+  confidence: high | medium | low
+
+rules:
+  - id: win_capacity_below_threshold
+    condition: o1_normalized_training_compute_capacity below policy threshold, strong inventory coverage, and no off-ledger capacity indicators
+    expected_related_window:
+      capacity_possible: false
+      highest_supported_label_from_capacity: 0_or_1
+    violation_interpretation: External/off-ledger capacity, bad normalization table, bad inventory, or wrong policy threshold.
+    source_refs: [excel_workbook, nvidia_smi, slurm_gres, epoch_frontier_datacenters]
+    confidence: high
+
+  - id: win_zero_allocation_strong_coverage
+    condition: o2_allocated_accelerator_count = 0 or o2_allocation_duration = 0 with strong scheduler coverage
+    expected_related_window:
+      o4_gpu_busy_percent: low_for_mapped_job_domain
+      o7_synchronized_fabric_footprint: near_zero_for_mapped_job_domain
+      o8_rack_it_power_kw: near_baseline_for_mapped_domain
+    violation_interpretation: Missing scheduler path, manual/off-ledger workload, mapping error, or attempted evasion.
+    source_refs: [excel_workbook, slurm_sacct, nvidia_smi, nvidia_ufm_telemetry]
+    confidence: high
+
+  - id: win_high_allocation_requires_activity_or_idle_explanation
+    condition: high o2_allocated_accelerator_count and long o2_allocation_duration
+    expected_related_window:
+      o4_gpu_busy_percent: elevated_or_explicitly_idle
+      o8_rack_it_power_kw: elevated_or_reservation_unused_explained
+      o7_scaleout_port_utilization: workload_dependent_but_not_forced_high
+    violation_interpretation: Reserved but unused capacity, failed job, scheduler accounting artifact, or hidden telemetry gap.
+    source_refs: [excel_workbook, slurm_sacct, nvidia_smi]
+    confidence: high
+
+  - id: win_gpu_power_to_rack_power
+    condition: high o4_gpu_power_draw_or_fraction across substantial o2_concurrency_fraction
+    expected_related_window:
+      o8_rack_it_power_kw: elevated above accelerator-domain baseline
+      o9_gpu_hbm_temperature_celsius: elevated or lagged response
+    violation_interpretation: Meter mapping error, power telemetry missing, baseline error, nonstandard power cap, or falsified GPU telemetry.
+    source_refs: [excel_workbook, nvidia_smi, nvidia_dcgm_exporter, nvidia_dgx_gb200_power]
+    confidence: medium
+
+  - id: win_high_power_low_visible_gpu
+    condition: high o8_rack_it_power_kw or o8_facility_it_power_mw with low visible GPU/fabric telemetry and strong coverage claimed
+    expected_related_window:
+      o8_power_to_telemetry_consistency: anomalous_high
+      required_explanation: non_gpu_load_or_mapping_issue_or_telemetry_gap
+    violation_interpretation: Hidden workload, mapping error, non-GPU IT load, baseline drift, or telemetry suppression.
+    source_refs: [excel_workbook, nvidia_smi, nvidia_dcgm_exporter]
+    confidence: medium
+
+  - id: win_scaleout_fabric_requires_visible_footprint
+    condition: high o7_scaleout_port_utilization and regular o7_collective_periodicity_step_cadence
+    expected_related_window:
+      o7_synchronized_fabric_footprint: material_fraction_or_count
+      o2_allocated_accelerator_count: aligned_if_scheduler_visible
+      o10_distributed_world_size_rank_count: aligned_if_runtime_visible
+    violation_interpretation: Missing job-port mapping, storage traffic, HPC/MPI, NCCL benchmark, or concealed scheduler/runtime path.
+    source_refs: [excel_workbook, nvidia_ufm_telemetry, nvidia_ib_port_counters, pytorch_distributed]
+    confidence: high
+
+  - id: win_runtime_world_size_bounds
+    condition: observed o10_distributed_world_size_rank_count
+    expected_related_window:
+      lower_bound: 1 when distributed runtime present
+      upper_bound: allocated_process_or_accelerator_count unless CPU ranks or multi-process-per-GPU explain excess
+    violation_interpretation: Bad linkage, partial visibility, CPU ranks included, off-ledger resources, or instrumentation bug.
+    source_refs: [excel_workbook, pytorch_distributed, pytorch_torchrun]
+    confidence: medium
+
+  - id: win_checkpoint_pattern_alignment
+    condition: high o11_checkpoint_write_size and regular o11_checkpoint_period
+    expected_related_window:
+      o2_allocation_duration: overlaps_checkpoint_window
+      o10_runtime_framework_class: training_or_checkpoint_capable_framework_or_unknown
+      o12_loss_optimizer_checkpoint_metadata: present_if_ml_logs_available
+    violation_interpretation: Backup/replication, storage rebuild, model export, or missing runtime/log visibility.
+    source_refs: [excel_workbook, aws_s3_server_access_logging, pytorch_distributed_checkpoint, mlflow_tracking]
+    confidence: medium
+
+  - id: win_signed_training_logs_require_activity_alignment
+    condition: high-authenticity O12 logs with large parameters/tokens/steps and optimizer/checkpoint metadata
+    expected_related_window:
+      o2_allocated_compute_hours: material_or_explained_external
+      o4_gpu_busy_percent: elevated_during_logged_steps
+      o7_collective_periodicity_step_cadence: compatible_with_step_time_for_distributed_runs
+    violation_interpretation: Fabricated/misaligned logs, delayed logs, unmonitored provider, or incorrect job mapping.
+    source_refs: [excel_workbook, mlflow_tracking, wandb_tracking, pytorch_distributed]
+    confidence: medium
+
+  - id: win_confidential_compute_counter_suppression
+    condition: o13_confidential_compute_security_mode in [on, confidential_compute_blocked]
+    expected_related_window:
+      o5_profiler_availability_state: disabled_or_security_blocked_allowed
+      o4_sm_tensor_core_active_percent: missing_or_reduced_allowed
+      o4_hbm_dram_bandwidth_active: missing_or_reduced_allowed
+    violation_interpretation: Do not treat missing profiler/counters as evasion unless CC declaration is inconsistent or other integrity failures align.
+    source_refs: [excel_workbook, nvidia_h100_confidential_computing]
+    confidence: medium
+
+  - id: win_low_coverage_blocks_no_run
+    condition: low o14_telemetry_coverage_fraction_by_layer or high o14_telemetry_gap_fraction_missed_scrapes in critical layers
+    expected_related_window:
+      negative_certification: capped_or_unavailable
+      label_0: forbidden_from_absence_only
+    violation_interpretation: Any no-run claim from missing data is invalid unless independent strong evidence exists.
+    source_refs: [excel_workbook, prometheus_promql_functions]
+    confidence: high
+
+  - id: win_cloud_reservation_without_activity
+    condition: high o3_capacity_reservation_block_duration and high o3_batch_provisioning_event_size
+    expected_related_window:
+      o2_allocated_accelerator_count: elevated_during_use_or_reservation_unused_explained
+      o4_gpu_busy_percent: elevated_during_use_or_low_if_unused
+      o3_billing_continuity_diurnal_index: consistent_with_reservation_billing
+    violation_interpretation: Unused reservation, account-linkage issue, provider abstraction, or concealed scheduler path.
+    source_refs: [excel_workbook, aws_ec2_capacity_blocks, aws_cur]
+    confidence: medium
+
+  - id: win_external_capacity_vs_inventory
+    condition: large o17_external_it_power_capacity_estimate or o17_chip_shipment_procurement_indicators
+    expected_related_window:
+      o1_accelerator_count: reconciled_with_uncertainty_and_commissioning_date
+      o17_construction_commissioning_timeline: complete_before_claimed_run
+    violation_interpretation: Off-ledger capacity, public estimate error, uncommissioned capacity, or hidden leased/cloud capacity.
+    source_refs: [excel_workbook, epoch_frontier_datacenters]
+    confidence: low
+
+  - id: win_hpc_or_inference_countervailing
+    condition: high GPU/fabric/power but runtime/storage/logs indicate HPC, inference, benchmark, backup, or serving
+    expected_related_window:
+      training_probability: capped_or_reduced_until_semantic_conflict_resolved
+      escalation: require_semantic_or_checkpoint_or_declaration_alignment
+    violation_interpretation: Legitimate false positive class or declaration mismatch/evasion if activity contradicts semantics.
+    source_refs: [excel_workbook, pytorch_distributed, nccl_env]
+    confidence: medium
+
+  - id: win_active_probe_claimed_idle
+    condition: claimed idle or low passive telemetry with active probes showing low throughput, high latency, or low free VRAM
+    expected_related_window:
+      hidden_activity_suspicion: elevated
+      required_corrobation: power_or_thermal_or_integrity_or_repeated_probe_alignment
+    violation_interpretation: Hidden workload, power cap, thermal state, legitimate background load, or probe calibration error.
+    source_refs: [excel_workbook, timing_memory_telemetry_gpu_governance]
+    confidence: low

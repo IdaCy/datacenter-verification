@@ -1,0 +1,246 @@
+catalog_id: feature_dependencies.v2
+created: "2026-05-12"
+status: directed_source_backed_dependency_graph
+purpose: >
+  Directed feature relationships for the v2 catalogue. Edges are sparse by design:
+  only deterministic formulas, physical constraints, expected couplings, lagged
+  relationships, trust modifiers, and semantic links that can be defended from
+  the workbook and supporting sources are included.
+
+edge_schema:
+  type: deterministic_formula | physical_constraint | expected_coupling | lagged_coupling | trust_modifier | semantic_link | discrepancy_check
+  parents: feature ids that influence or constrain the child/concept
+  children: feature ids or derived concepts affected by the parents
+  unit_effects: included only where a defensible formula/local effect exists
+  confidence: high | medium | low
+
+derived_concepts:
+  - capacity_possible
+  - provisioned_compute_commitment
+  - account_scheduler_consistency
+  - visible_activity_score
+  - physical_load_score
+  - training_semantic_score
+  - telemetry_trust_score
+  - hidden_activity_suspicion
+  - offledger_capacity_suspicion
+
+edges:
+  - id: dep_o2_allocated_compute_hours
+    type: deterministic_formula
+    parents: [o2_allocated_accelerator_count, o2_allocation_duration, o1_normalized_training_compute_capacity]
+    children: [o2_allocated_compute_hours]
+    formula: allocated_compute_hours = allocated_accelerator_count * allocation_duration_hours * hardware_normalization_factor
+    unit_effects:
+      one_more_allocated_accelerator: allocation_duration_hours * hardware_normalization_factor
+      one_more_allocation_hour: allocated_accelerator_count * hardware_normalization_factor
+    probability_effect: Higher derived compute increases policy-scale activity evidence when scheduler coverage is strong.
+    source_refs: [excel_workbook, slurm_sacct, slurm_tres]
+    confidence: high
+
+  - id: dep_o2_concurrency_fraction
+    type: deterministic_formula
+    parents: [o2_allocated_accelerator_count, o1_accelerator_count, o1_largest_low_latency_topology_footprint]
+    children: [o2_concurrency_fraction]
+    formula: concurrency_fraction = allocated_accelerator_count / relevant_site_or_topology_domain_capacity
+    unit_effects:
+      one_more_allocated_accelerator: 1 / denominator
+      one_more_denominator_accelerator: nonlinear; recompute formula
+    probability_effect: Higher fraction supports large coordinated run; values above 1 are discrepancy flags unless scope explains them.
+    source_refs: [excel_workbook, slurm_sacct, slurm_tres]
+    confidence: high
+
+  - id: dep_capacity_possible
+    type: physical_constraint
+    parents: [o1_normalized_training_compute_capacity, o1_homogeneous_high_end_accelerator_fraction, o1_largest_low_latency_topology_footprint, o1_partitioning_fraction]
+    children: [capacity_possible]
+    rule: Policy-scale monitored training is impossible when normalized capacity/topology is below threshold and no off-ledger capacity is indicated.
+    probability_effect: Capacity enables but does not prove activity; capacity-only evidence is capped at label 1.
+    source_refs: [excel_workbook, nvidia_smi, slurm_gres]
+    confidence: high
+
+  - id: dep_capacity_bounds_visible_counts
+    type: physical_constraint
+    parents: [o1_accelerator_count, o1_largest_low_latency_topology_footprint]
+    children: [o2_allocated_accelerator_count, o3_batch_provisioning_event_size, o7_synchronized_fabric_footprint, o10_distributed_world_size_rank_count]
+    rule: Visible allocation, provisioned, synchronized-fabric, and rank counts should not exceed the relevant monitored capacity/domain unless scope, federation, or off-ledger capacity explains the excess.
+    probability_effect: Violations raise consistency/evasion suspicion, not direct training probability.
+    source_refs: [excel_workbook, slurm_sacct, aws_ec2_runinstances, pytorch_distributed]
+    confidence: high
+
+  - id: dep_cloud_provisioned_commitment
+    type: deterministic_formula
+    parents: [o3_batch_provisioning_event_size, o3_capacity_reservation_block_duration, o3_training_instance_type_fraction]
+    children: [provisioned_compute_commitment]
+    formula: provisioned_compute_commitment ~= provisioning_event_size * reservation_duration * training_instance_type_fraction
+    unit_effects:
+      one_more_provisioned_accelerator: reservation_duration * training_instance_type_fraction
+      one_more_reservation_hour: provisioning_event_size * training_instance_type_fraction
+    probability_effect: Larger cloud commitment raises candidate priority but remains provisioning evidence until activity layers align.
+    source_refs: [excel_workbook, aws_ec2_capacity_blocks, aws_ec2_cloudtrail, aws_ec2_runinstances]
+    confidence: medium
+
+  - id: dep_cloud_scheduler_consistency
+    type: discrepancy_check
+    parents: [o3_batch_provisioning_event_size, o3_capacity_reservation_block_duration, o2_allocated_accelerator_count, o2_allocation_duration]
+    children: [account_scheduler_consistency]
+    rule: Cloud provisioning/reservation mass should roughly align with scheduler allocation in the same account/org, placement, and time window after accounting for unused reservations.
+    probability_effect: Mismatch can mean unused reservation, missing scheduler visibility, account linkage error, or evasion.
+    source_refs: [excel_workbook, aws_ec2_cloudtrail, aws_cur, slurm_sacct]
+    confidence: medium
+
+  - id: dep_gpu_activity_bundle
+    type: expected_coupling
+    parents: [o4_gpu_busy_percent, o4_sm_tensor_core_active_percent, o4_hbm_memory_used, o4_hbm_dram_bandwidth_active, o4_gpu_power_draw_or_fraction]
+    children: [visible_activity_score]
+    rule: Sustained high GPU utilization, tensor activity, memory pressure, bandwidth, and power should generally co-occur during dense accelerator workloads.
+    probability_effect: Joint elevation is stronger than any one GPU counter; isolated elevation needs benign-explanation checks.
+    source_refs: [excel_workbook, nvidia_smi, nvidia_dcgm_exporter]
+    confidence: high
+
+  - id: dep_gpu_power_to_rack_power
+    type: expected_coupling
+    parents: [o4_gpu_power_draw_or_fraction, o2_concurrency_fraction, o8_rack_it_power_kw]
+    children: [o8_power_to_telemetry_consistency, physical_load_score]
+    rule: High visible GPU power over a substantial domain should correspond to elevated rack/server power after mapping and baseline subtraction.
+    probability_effect: Alignment corroborates load; high rack power with low visible GPU telemetry raises discrepancy rather than direct proof.
+    source_refs: [excel_workbook, nvidia_smi, nvidia_dcgm_exporter, nvidia_dgx_gb200_power]
+    confidence: medium
+
+  - id: dep_power_to_thermal_lag
+    type: lagged_coupling
+    parents: [o8_rack_it_power_kw, o8_facility_it_power_mw, o4_gpu_power_draw_or_fraction]
+    children: [o9_gpu_hbm_temperature_celsius, o9_liquid_cooling_delta_t_celsius, o9_cooling_flow_fan_speed]
+    rule: Sustained power/load should be followed or accompanied by thermal/cooling response, with site- and hardware-specific lag.
+    probability_effect: Thermal alignment corroborates sustained load but cannot identify workload.
+    source_refs: [excel_workbook, nvidia_smi, nvidia_dcgm_exporter, nvidia_dgx_gb200_power]
+    confidence: medium
+
+  - id: dep_local_scaleout_fabric_alignment
+    type: expected_coupling
+    parents: [o6_nvlink_nvswitch_link_utilization, o6_nvlink_nvswitch_correlation_periodicity, o7_scaleout_port_utilization, o7_collective_periodicity_step_cadence]
+    children: [visible_activity_score]
+    rule: Multi-node distributed training often creates aligned local and scale-out communication patterns, though parallelism strategy can make one layer weaker than the other.
+    probability_effect: Alignment strengthens coordinated-run evidence; disagreement should be interpreted by workload class/topology.
+    source_refs: [excel_workbook, nvidia_dcgm_exporter, nvidia_ufm_telemetry, nccl_env]
+    confidence: medium
+
+  - id: dep_scaleout_collective_bundle
+    type: expected_coupling
+    parents: [o7_scaleout_port_utilization, o7_synchronized_fabric_footprint, o7_collective_periodicity_step_cadence, o7_rdma_congestion_retry_drops]
+    children: [visible_activity_score]
+    rule: Correlated utilization, broad footprint, periodic cadence, and congestion/retry alignment are the core non-semantic distributed-run fabric pattern.
+    probability_effect: Strongest non-semantic activity layer; still capped below definite without semantics or cross-layer corroboration.
+    source_refs: [excel_workbook, nvidia_ufm_telemetry, nvidia_ib_port_counters, nccl_env]
+    confidence: high
+
+  - id: dep_fabric_runtime_world_size
+    type: expected_coupling
+    parents: [o7_synchronized_fabric_footprint, o10_distributed_world_size_rank_count, o10_rendezvous_rank_mapping_stability, o7_job_to_port_mapping_coverage]
+    children: [training_semantic_score]
+    rule: Large synchronized fabric footprint should align with large stable distributed world size when runtime visibility and job-port mapping are adequate.
+    probability_effect: Alignment increases attribution; mismatch raises mapping, visibility, or evasion questions.
+    source_refs: [excel_workbook, pytorch_distributed, pytorch_torchrun, nvidia_ufm_telemetry]
+    confidence: medium
+
+  - id: dep_runtime_framework_interpretation
+    type: semantic_link
+    parents: [o10_runtime_framework_class, o10_container_vm_image_digest_recurrence, o2_declared_workload_class]
+    children: [training_semantic_score]
+    rule: Framework/image/declaration classes interpret high activity as training, inference, HPC, benchmark, or data movement.
+    probability_effect: Training-class evidence raises semantic confidence only when authentic and cross-layer consistent; inference/HPC classes can be countervailing.
+    source_refs: [excel_workbook, pytorch_distributed, kubernetes_device_plugins, nccl_env]
+    confidence: medium
+
+  - id: dep_storage_training_pattern
+    type: expected_coupling
+    parents: [o11_initial_data_staging_volume, o11_checkpoint_write_size, o11_checkpoint_period, o11_read_write_operation_pattern, o10_runtime_framework_class]
+    children: [training_semantic_score]
+    rule: Training often creates pre-run staging, repeated shard reads, periodic checkpoint writes, and post-run artifacts aligned with job/runtime windows.
+    probability_effect: Storage pattern is supportive/semantic when aligned; backup/ETL can mimic it.
+    source_refs: [excel_workbook, aws_s3_server_access_logging, pytorch_distributed_checkpoint, mlflow_tracking]
+    confidence: medium
+
+  - id: dep_declared_compute_from_logs
+    type: deterministic_formula
+    parents: [o12_declared_model_parameter_count, o12_training_tokens_examples, o12_step_count_and_step_time]
+    children: [training_semantic_score]
+    formula: declared_training_compute ~= policy_formula(parameters, tokens_or_examples, steps, architecture_factor)
+    unit_effects:
+      one_more_declared_parameter: tokens_or_examples * architecture_factor
+      one_more_training_token_or_example: declared_parameters * architecture_factor
+    probability_effect: High declared compute is strong semantic evidence only if signed, complete, and activity-consistent.
+    source_refs: [excel_workbook, mlflow_tracking, wandb_tracking]
+    confidence: medium
+
+  - id: dep_step_cadence_to_fabric_periodicity
+    type: expected_coupling
+    parents: [o12_step_count_and_step_time, o7_collective_periodicity_step_cadence]
+    children: [training_semantic_score]
+    rule: Training step timing and fabric collective cadence should be compatible in windows with visible distributed training.
+    probability_effect: Alignment strengthens training interpretation; mismatch may mean logging delay, missing fabric, or non-training workload.
+    source_refs: [excel_workbook, pytorch_distributed, nccl_env]
+    confidence: medium
+
+  - id: dep_ml_log_authenticity_bundle
+    type: semantic_link
+    parents: [o12_loss_optimizer_checkpoint_metadata, o12_declared_model_parameter_count, o12_training_tokens_examples, o12_step_count_and_step_time]
+    children: [training_semantic_score]
+    rule: Loss curves, optimizer metadata, checkpoint metadata, declared scale, and steps are the highest-value semantic training evidence when authentic.
+    probability_effect: Can support label 4 only with authenticity and primary activity alignment.
+    source_refs: [excel_workbook, mlflow_tracking, wandb_tracking, pytorch_distributed_checkpoint]
+    confidence: medium
+
+  - id: dep_attestation_telemetry_trust
+    type: trust_modifier
+    parents: [o13_attestation_validity, o13_telemetry_collector_measurement, o14_telemetry_coverage_fraction_by_layer, o14_clock_drift_synchronization_error]
+    children: [telemetry_trust_score]
+    rule: Attestation, collector measurements, coverage, and clock sync determine whether telemetry can support positive or negative claims.
+    probability_effect: Trust features modify confidence and caps; they do not prove training.
+    source_refs: [excel_workbook, nvidia_h100_confidential_computing]
+    confidence: high
+
+  - id: dep_confidential_compute_counter_availability
+    type: trust_modifier
+    parents: [o13_confidential_compute_security_mode]
+    children: [o5_profiler_availability_state, o4_sm_tensor_core_active_percent, o4_hbm_dram_bandwidth_active]
+    rule: Confidential-compute/security modes can disable or restrict performance counters and profiling.
+    probability_effect: Counter absence under declared CC mode should reduce observability, not imply zero activity or evasion by itself.
+    source_refs: [excel_workbook, nvidia_h100_confidential_computing]
+    confidence: medium
+
+  - id: dep_monitoring_integrity_bundle
+    type: trust_modifier
+    parents: [o14_telemetry_coverage_fraction_by_layer, o14_telemetry_gap_fraction_missed_scrapes, o14_clock_drift_synchronization_error, o14_counter_reset_config_change_count]
+    children: [telemetry_trust_score]
+    rule: Coverage gaps, missed scrapes, drift, and resets control negative-certification confidence and cross-layer alignment.
+    probability_effect: Low integrity cannot prove training alone but can trigger escalation when aligned with activity/physical evidence.
+    source_refs: [excel_workbook, nvidia_dcgm_exporter, nvidia_ufm_telemetry]
+    confidence: high
+
+  - id: dep_physical_change_integrity
+    type: trust_modifier
+    parents: [o15_rack_door_badge_maintenance_events, o15_firmware_bmc_change_events, o1_inventory_delta_rate, o13_attestation_validity]
+    children: [telemetry_trust_score]
+    rule: Physical access, maintenance, firmware/BMC changes, and inventory deltas can explain or aggravate telemetry anomalies.
+    probability_effect: Physical-change records modify trust and discrepancy severity, not positive training probability alone.
+    source_refs: [excel_workbook, nvidia_h100_confidential_computing]
+    confidence: medium
+
+  - id: dep_active_probe_hidden_activity
+    type: expected_coupling
+    parents: [o16_probe_throughput_ratio, o16_probe_latency_inflation, o16_vram_residency_free_memory_test, o4_gpu_busy_percent, o8_rack_it_power_kw]
+    children: [hidden_activity_suspicion]
+    rule: Probe degradation in a claimed-idle window can indicate hidden contention when passive telemetry is unavailable or distrusted.
+    probability_effect: Raises weak-trust suspicion; requires benign-explanation checks and cannot by itself prove training.
+    source_refs: [excel_workbook, timing_memory_telemetry_gpu_governance, nvidia_smi]
+    confidence: low
+
+  - id: dep_external_capacity_reconciliation
+    type: discrepancy_check
+    parents: [o17_external_it_power_capacity_estimate, o17_chip_shipment_procurement_indicators, o17_construction_commissioning_timeline, o1_accelerator_count]
+    children: [offledger_capacity_suspicion]
+    rule: External capacity/procurement/timeline evidence should be reconcilable with declared monitored inventory and commissioning dates.
+    probability_effect: Mismatch raises capacity-discovery concern, not active-run proof.
+    source_refs: [excel_workbook, epoch_frontier_datacenters]
+    confidence: low
