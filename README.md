@@ -2,9 +2,7 @@
 
 work in progress.
 
-this repo is for a study on whether rich datacenter telemetry can help detect, rule out, and explain large AI training runs on monitored GPU clusters
-
-[try-out interface](https://idacy.github.io/datacenter-verification/index.html)
+this repo is for a study on what datacenter telemetry could help detect, rule out, and explain large AI training runs on monitored GPU clusters
 
 basic idea: access to the right internal datacenter data - then a large training run should leave a pattern including several layers;
 
@@ -16,47 +14,31 @@ basic idea: access to the right internal datacenter data - then a large training
 - storage, checkpoint, runtime, or ML-log evidence when available
 - monitoring coverage strong enough that missing evidence actually means something
 
-we're doing data and modeling pipeline right now
-
-## interactive demo
-
-An unlisted static demo is hosted here:
-
-https://idacy.github.io/datacenter-verification/
-
-It replays the synthetic v0 model outputs and includes a browser-side rule sandbox for changing evidence inputs. Selecting a datapoint shows the trained tabular model's exported prediction for that synthetic window; moving an evidence control switches to the local rule sandbox so the page can respond instantly without server-side model inference. All data shown there is synthetic and fictional.
-
-Regenerate the hosted demo payload from this repo with:
-
-```bash
-python src/datacenter_verification_web/export_static_demo_data.py \
-  --output ../IdaCy.github.io/datacenter-verification/data/demo-data.json
-```
-
-This writes both `demo-data.json` and a local-file-friendly `demo-data.js` payload for the static page.
+the current direction is the algorithmic evidence catalog
 
 ## current status
 
 this is early. the repo currently contains public scaffolding for:
 
-- synthetic datacenter data generation work under `src/datacenter_verification_synthetic/`
-- dataset validators under `src/datacenter_verification_validators/`
-- public generated or study data under `data/`
+- the v2 evidence catalog under `catalog/`
+- source-backed observable and feature definitions
+- qualitative feature effects for large-training evidence
+- dependency rules between observables
+- plausibility checks across evidence layers
+- discrepancy and evasion rules
 
-the synthetic generator is still being built. the validator package is present and can already check whether a generated dataset has the structure and patterns the study expects.
+private planning notes, paper drafts, and working documents live under `xx_private/`. that directory is intentionally gitignored and is not part of the public repo
 
-private planning notes, paper drafts, and working documents live under `xx_private/`. that directory is intentionally gitignored and is not part of the public repo.
+## what one audit window means
 
-## what one datapoint means (see more: data/)
+the framework should not reason from one raw telemetry sample
 
-the model should not train on one raw telemetry sample.
+a raw sample might be one GPU utilization measurement, one rack power reading, one scheduler event, one fabric counter, or one storage log entry. those are inputs
 
-a raw sample might be one GPU utilization measurement, one rack power reading, one scheduler event, or one fabric counter. those are inputs.
-
-one ML datapoint is a windowed feature row:
+one audit window is a structured evidence row:
 
 ```text
-site + scope + time window -> features -> label
+site + scope + time window -> features -> evidence level
 ```
 
 for example:
@@ -68,14 +50,13 @@ site_a, topology_domain_03, 2026-05-10 12:00:00Z to 13:00:00Z
 that row should summarize what was true in that window:
 
 - how much capacity existed
-- how many normalized GPUs were allocated
+- how many normalized accelerators were allocated
 - how long the allocation lasted
-- how high utilization and power were
-- whether fabric traffic looked synchronized
-- whether checkpoint or runtime evidence appeared
+- how high utilization, fabric traffic, and power were
+- whether checkpoint, runtime, declaration, or ML-log evidence appeared
 - which observability layers were missing or delayed
 - how much trust to place in the telemetry
-- the label, from `0` to `4`
+- the evidence level, from `0` to `4`
 
 ## labels
 
@@ -89,101 +70,57 @@ the study uses five evidence levels:
 4 = highest warning or definite
 ```
 
-no big truth, but they're a structured way to train and test whether evidence from many datacenter systems points toward a large training run
+no big truth, but they're a structured way to test whether evidence from many datacenter systems points toward a large training run
 
 then:
 
-- capacity alone can only make training possible  
-- missing data is not the same as zero activity  
-- integrity problems are not proof of training by themselves  
-- high power alone is not training proof  
-- labels `3` and `4` should require coherent evidence across independent layers  
+- capacity alone can only make training possible
+- missing data is not the same as zero activity
+- integrity problems are not proof of training by themselves
+- high power alone is not training proof
+- labels `3` and `4` should require coherent evidence across independent layers or authenticated semantic evidence
 
-## planned public structure
+## public structure
 
 ```text
 .
-├── data/
-│   └── synthetic_v0/
-│       ├── raw_normalized/
-│       ├── features/
-│       ├── examples/
-│       ├── schemas/
-│       └── validation/
-├── src/
-│   ├── datacenter_verification_synthetic/
-│   └── datacenter_verification_validators/
-└── README.md
+├── catalog/
+│   ├── catalog_index.v2.yaml
+│   ├── observable_feature_catalog.v2.yaml
+│   ├── training_probability_effects.v2.yaml
+│   ├── feature_dependencies.v2.yaml
+│   ├── conditional_plausibility_windows.v2.yaml
+│   ├── discrepancy_evasion_rules.v2.yaml
+│   └── validate_v2_catalog.py
+├── README.md
+└── READMEsuggested.md
 ```
 
-planned data files:
-
-```text
-data/synthetic_v0/raw_normalized/metric_samples.jsonl
-data/synthetic_v0/raw_normalized/event_records.jsonl
-data/synthetic_v0/raw_normalized/snapshot_records.jsonl
-data/synthetic_v0/features/window_features_all.csv
-data/synthetic_v0/examples/one_datapoint_label0.json
-data/synthetic_v0/examples/one_datapoint_label1.json
-data/synthetic_v0/examples/one_datapoint_label2.json
-data/synthetic_v0/examples/one_datapoint_label3.json
-data/synthetic_v0/examples/one_datapoint_label4.json
-```
-
-## validators
-
-the validator checks whether generated data has the patterns we actually want
-
-run:
+validate:
 
 ```bash
-python -m src.datacenter_verification_validators --dataset data/synthetic_v0
+python3 catalog/validate_v2_catalog.py
 ```
 
-it checks things like:
+## catalog
 
-- all required files exist
-- raw `JSONL` records parse
-- feature rows have required columns
-- labels are in the `0-4` range
-- timestamps use `UTC`
-- every observable family `O1-O17` has coverage and missingness columns
-- missing telemetry is explicit
-- capacity-only rows do not become positive training labels
-- physical-only rows do not exceed supportive evidence
-- integrity-only rows do not become training proof
-- likely training rows contain allocation, GPU, fabric, power, storage, or semantic coherence
-- hard false positives are present, such as HPC, batch inference, benchmarks, burn-in, and storage rebuilds
+the catalog is not a trained detector
 
-the validator writes:
+it records what evidence exists, what it can support, where it is ambiguous, and what combinations should raise a discrepancy
 
-```text
-data/synthetic_v0/validation/validation_report.md
-```
+the main files are:
 
-## intended data patterns
+- `observable_feature_catalog.v2.yaml` for observables and features
+- `training_probability_effects.v2.yaml` for evidence direction and caps
+- `feature_dependencies.v2.yaml` for feature relationships
+- `conditional_plausibility_windows.v2.yaml` for cross-layer plausibility checks
+- `discrepancy_evasion_rules.v2.yaml` for anomaly and evasion hypotheses
 
-the generated data should not be random columns sampled independently.
+## intended evidence patterns
 
-it should be generated from latent episodes, such as:
+the evidence should not be random columns sampled independently
 
-- idle
-- normal inference
-- large batch inference
-- synthetic data generation
-- small fine-tune
-- large fine-tune
-- pretraining
-- HPC simulation
-- NCCL benchmark
-- hardware burn-in
-- storage rebuild
-- reserved but unused capacity
-- maintenance window
-- fragmented training
-- counter-suppressed candidate window
-
-those episodes should create dependent telemetry. for example:
+a large training run should create dependent telemetry. for example:
 
 - high GPU utilization should usually raise rack power
 - sustained training should usually create synchronized fabric patterns
@@ -192,36 +129,20 @@ those episodes should create dependent telemetry. for example:
 - large reserved capacity with no GPU load should not look like active training
 - high power with missing GPU telemetry should become an integrity warning
 
-this dependence structure is the point of the study. if the synthetic data does not preserve these relationships, a model trained on it will learn the wrong thing.
+hard false positives need to stay first-class, such as HPC, batch inference, benchmarks, burn-in, storage rebuilds, and reserved but unused capacity
 
-## modeling direction
-
-the planned detector is a small auditable tabular model trained on windowed feature rows.
-
-the current default direction is a calibrated gradient-boosted tree model, not a language model. a language model may be useful later for summarizing audit evidence or messy free text, but it should not be the core detector.
-
-the model output should stay multi-part:
-
-- probability for each label `0-4`
-- probability of large training
-- negative-certification confidence
-- capacity possible
-- integrity warning
-- critical missing layers
-- top evidence
-
-those outputs should not be collapsed into one opaque score.
+this dependence structure is the point of the study. simple thresholds are not enough
 
 ## why this exists
 
-public information about datacenters is too incomplete for strong verification. if governance depends on knowing whether very large training runs happened, then the useful evidence is likely inside monitored clusters: scheduler logs, GPU telemetry, fabric counters, power data, runtime metadata, storage logs, declarations, and monitoring-integrity records.
+public information about datacenters is too incomplete for strong verification. if governance depends on knowing whether very large training runs happened, then the useful evidence is likely inside monitored clusters: scheduler logs, GPU telemetry, fabric counters, power data, runtime metadata, storage logs, declarations, and monitoring-integrity records
 
-this repo is an attempt to make that evidence model concrete enough to simulate, test, criticize, and eventually compare against real datacenter telemetry.
+this repo is an attempt to make that evidence model concrete enough to inspect, test, criticize, and eventually compare against real datacenter telemetry
 
 ## not ready yet
 
-this repo is not a finished compliance tool.
+this repo is not a finished compliance tool
 
-it does not yet provide a trained model. it does not yet provide enforcement-grade claims. it is a study scaffold for building synthetic data, validating that the data has the right evidence structure, and later training/testing a detector under clear assumptions.
+it does not provide enforcement-grade claims. it is a study scaffold for specifying what observable datacenter evidence could support detection, negative certification, attribution, and discrepancy review
 
-expect the schemas, labels, generator, and validators to change as the study gets sharper.
+expect the catalog, thresholds, label rules, and examples to change as the study gets sharper
