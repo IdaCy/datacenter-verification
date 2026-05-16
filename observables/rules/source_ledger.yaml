@@ -1,0 +1,217 @@
+schema_version: '0.1'
+created: '2026-05-16'
+purpose: Public source ledger for Sxx source_refs used by observable rule files.
+source_policy:
+  source_refs_scope: Rules under observables/rules use these source keys for public provenance.
+  self_contained_public_ledger: true
+sources:
+- id: S01
+  title: EU AI Act Article 51
+  url: https://ai-act-service-desk.ec.europa.eu/en/ai-act/article-51
+  summary: systemic-risk GPAI presumption at greater than `10^25` FLOP, with threshold update provisions.
+- id: S02
+  title: EU AI Act Article 52
+  url: https://ai-act-service-desk.ec.europa.eu/en/ai-act/article-52
+  summary: notification timing after a systemic-risk GPAI model meets the Article 51 condition.
+- id: S03
+  title: EU AI Act Annex XI
+  url: https://ai-act-service-desk.ec.europa.eu/en/ai-act/annex-11
+  summary: technical documentation includes computational resources, training time, and energy consumption.
+- id: S04
+  title: NVIDIA H100 Tensor Core GPU official product/spec pages
+  url: https://www.nvidia.com/en-us/data-center/h100/
+  summary: advertised peak tensor rates, memory capacity, memory bandwidth, NVLink, and power envelopes.
+- id: S05
+  title: NVIDIA H200 Tensor Core GPU official product/spec pages
+  url: https://www.nvidia.com/en-us/data-center/h200/
+  summary: memory capacity, HBM bandwidth, NVLink, and tensor performance context.
+- id: S06
+  title: NVIDIA Blackwell/B200 official product/spec pages
+  url: https://www.nvidia.com/en-us/data-center/technologies/blackwell-architecture/
+  summary: advertised generation-level performance and memory/fabric context.
+- id: S07
+  title: NVIDIA DCGM Exporter docs
+  url: https://docs.nvidia.com/datacenter/dcgm/latest/gpu-telemetry/dcgm-exporter.html
+  summary: Prometheus export of GPU telemetry such as power, energy, temperature, clocks, memory,
+    PCIe/NVLink, profiling counters, and MIG-aware metrics.
+- id: S08
+  title: NVIDIA DCGM field IDs
+  url: https://docs.nvidia.com/datacenter/dcgm/latest/dcgm-api/dcgm-api-field-ids.html
+  summary: field definitions for utilization, power, temperature, clocks, errors, NVLink/PCIe, profiling,
+    and health counters.
+- id: S09
+  title: NVIDIA System Management Interface docs
+  url: https://docs.nvidia.com/deploy/nvidia-smi/
+  summary: queryable device inventory, memory, utilization, clocks, power, temperature, performance
+    states, throttle reasons, ECC, retired pages, accounting, and MIG state.
+- id: S10
+  title: NVIDIA MIG User Guide
+  url: https://docs.nvidia.com/datacenter/tesla/mig-user-guide/
+  summary: GPU instances, compute instances, profiles, and partitioning behavior.
+- id: S11
+  title: NVIDIA NCCL collectives documentation
+  url: https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/collectives.html
+  summary: AllReduce, ReduceScatter, AllGather, Broadcast, Reduce, point-to-point, and collective
+    communication semantics.
+- id: S12
+  title: PyTorch DistributedDataParallel docs
+  url: https://pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html
+  summary: distributed training synchronizes gradients across model replicas.
+- id: S13
+  title: PyTorch FullyShardedDataParallel docs
+  url: https://pytorch.org/docs/stable/fsdp.html
+  summary: parameter sharding and collective communication such as all-gather and reduce-scatter during
+    training.
+- id: S14
+  title: DeepSpeed ZeRO-3 docs
+  url: https://deepspeed.readthedocs.io/en/stable/zero3.html
+  summary: ZeRO partitions optimizer states, gradients, and parameters, requiring coordinated all-gather/reduce-scatter
+    style movement.
+- id: S15
+  title: JAX Scaling Book, training parallelism
+  url: https://jax-ml.github.io/scaling-book/training/
+  summary: mechanism-level discussion of data, tensor, pipeline, and sharded training communication
+    costs.
+- id: S16
+  title: Demystifying the Communication Characteristics for Distributed Transformer Models
+  url: https://arxiv.org/abs/2408.10197
+  summary: research evidence that transformer training produces structured communication traces and
+    that communication can dominate at scale.
+- id: S17
+  title: A Tale of Two Cs, Computation vs. Communication Scaling
+  url: https://research.cs.wisc.edu/hal/papers/spati-iiswc23-totc.pdf
+  summary: research on data-parallel and tensor-parallel communication/computation scaling.
+- id: S18
+  title: Slurm `sacct` docs
+  url: https://slurm.schedmd.com/sacct.html
+  summary: accounting records for jobs, elapsed time, states, allocations, TRES, energy, and selected
+    I/O.
+- id: S19
+  title: Slurm GRES docs
+  url: https://slurm.schedmd.com/gres.html
+  summary: GPU generic resources, typed GPUs, NVML autodetection, MIG/MPS configuration, and GPU accounting
+    surfaces.
+- id: S20
+  title: Kubernetes device plugins
+  url: https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/
+  summary: vendor devices exposed as extended resources and allocated to pods.
+- id: S21
+  title: Kubernetes audit logging
+  url: https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/
+  summary: chronological API-server audit records under configured policy.
+- id: S22
+  title: Kubernetes Events API
+  url: https://kubernetes.io/docs/reference/kubernetes-api/cluster-resources/event-v1/
+  summary: source-emitted lifecycle events with involved objects, reasons, and event times.
+- id: S23
+  title: AWS EC2 Capacity Blocks for ML
+  url: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-capacity-blocks.html
+  summary: capacity reservation start time, duration, instance type, and quantity concepts for accelerated
+    instances.
+- id: S24
+  title: AWS EC2 P5/P5e/P5en instance pages
+  url: https://aws.amazon.com/ec2/instance-types/p5/
+  summary: H100/H200 instances, accelerator count, EFA, and high-throughput networking context.
+- id: S25
+  title: AWS Elastic Fabric Adapter
+  url: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html
+  summary: low-latency, high-throughput network interface for tightly coupled HPC and ML workloads.
+- id: S26
+  title: AWS Cost and Usage Reports
+  url: https://docs.aws.amazon.com/cur/latest/userguide/what-is-cur.html
+  summary: usage line items, usage type, operation, time interval, product, and resource fields when
+    enabled.
+- id: S27
+  title: AWS CloudTrail concepts
+  url: https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-concepts.html
+  summary: management, data, network activity, event time, resource, and actor records, with coverage
+    depending on configuration.
+- id: S28
+  title: AWS VPC Flow Logs records
+  url: https://docs.aws.amazon.com/vpc/latest/userguide/flow-log-records.html
+  summary: byte/packet records, aggregation intervals, traffic-path fields, and skipped-data/delivery
+    caveats.
+- id: S29
+  title: Google Cloud VPC Flow Logs
+  url: https://cloud.google.com/vpc/docs/flow-logs
+  summary: sampled and aggregated flow logs, metadata annotations, aggregation intervals, and RDMA
+    flow caveats.
+- id: S30
+  title: Azure NSG Flow Logs overview
+  url: https://learn.microsoft.com/en-us/azure/network-watcher/nsg-flow-logs-overview
+  summary: inbound/outbound flow logging and collection/export limitations.
+- id: S31
+  title: Amazon S3 server access logging
+  url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/ServerLogs.html
+  summary: object request logs, operation, bytes, timing, and best-effort delivery caveats.
+- id: S32
+  title: Amazon S3 log format
+  url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/LogFormat.html
+  summary: fields for operation, object key, bytes sent, object size, requester, and timing.
+- id: S33
+  title: Amazon FSx for Lustre metrics
+  url: https://docs.aws.amazon.com/fsx/latest/LustreGuide/fs-metrics.html
+  summary: filesystem throughput, metadata operations, client I/O, queueing, and storage performance
+    metrics.
+- id: S34
+  title: Google Cloud Audit Logs
+  url: https://cloud.google.com/logging/docs/audit
+  summary: Admin Activity, Data Access, System Event, and Policy Denied audit log types.
+- id: S35
+  title: Google Cloud detailed billing export
+  url: https://cloud.google.com/billing/docs/how-to/export-data-bigquery-tables/detailed-usage
+  summary: usage, SKU, project, service, labels, and resource fields in BigQuery export.
+- id: S36
+  title: Google Compute Engine GPU monitoring
+  url: https://cloud.google.com/compute/docs/gpus/monitor-gpus
+  summary: GPU utilization and metric collection for Compute Engine VMs.
+- id: S37
+  title: Google Cloud TPU monitoring library
+  url: https://cloud.google.com/tpu/docs/tpu-monitoring-library
+  summary: TPU TensorCore utilization, duty cycle, memory, and related metrics.
+- id: S38
+  title: AWS Container Insights enhanced observability metrics
+  url: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Container-Insights-metrics-enhanced-EKS.html
+  summary: EKS/container, GPU, Neuron, EFA, pod, node, and network/storage infrastructure metrics.
+- id: S39
+  title: AWS Neuron monitoring docs
+  url: https://awsdocs-neuron.readthedocs-hosted.com/en/latest/tools/neuron-sys-tools/neuron-monitor-user-guide.html
+  summary: accelerator utilization, memory, runtime, and Neuron-device metrics.
+- id: S40
+  title: DMTF Redfish standards
+  url: https://www.dmtf.org/standards/redfish
+  summary: standard management model for servers, power, thermal, telemetry, logs, fabrics, storage,
+    firmware, and cooling equipment.
+- id: S41
+  title: Redfish Resource and Schema Guide DSP2046
+  url: https://redfish.dmtf.org/schemas/DSP2046_2025.2.html
+  summary: schemas for chassis, power, thermal, environment metrics, power distribution, log services,
+    firmware, and related management records.
+- id: S42
+  title: NVIDIA UFM Telemetry docs
+  url: https://docs.nvidia.com/networking/display/ufmsdnappumv4160/telemetry
+  summary: InfiniBand fabric telemetry, bandwidth, latency, congestion, errors, and XmitWait-style
+    fabric counters.
+- id: S43
+  title: NVIDIA UFM supported port counters/events
+  url: https://docs.nvidia.com/networking/display/ufmsdnappumv41814/Appendix+-+Supported+Port+Counters+and+Events
+  summary: transmit/receive counters, congestion, errors, and port event surfaces.
+- id: S44
+  title: Epoch AI data centers dataset
+  url: https://epoch.ai/data/data-centers
+  summary: public site-specific power, accelerator, commissioning, and public-evidence context for
+    AI datacenters.
+- id: S45
+  title: PyTorch Distributed Checkpoint docs
+  url: https://docs.pytorch.org/docs/main/distributed.checkpoint.html
+  summary: distributed checkpoint save/load, per-rank checkpoint files, and topology-independent resharding
+    support.
+- id: S46
+  title: DeepSpeed model checkpointing docs
+  url: https://deepspeed.readthedocs.io/en/latest/model-checkpointing.html
+  summary: training checkpoint save/load, optimizer/scheduler state handling, and ZeRO checkpoint
+    behavior.
+- id: S47
+  title: TensorFlow training checkpoint guide
+  url: https://www.tensorflow.org/guide/checkpoint
+  summary: periodic checkpoint writes, optimizer/model state, and checkpoint file layout.

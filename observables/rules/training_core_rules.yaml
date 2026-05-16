@@ -1,38 +1,36 @@
 schema_version: "0.1"
 created: "2026-05-16"
 source_inventory: observables/observables.yaml
-status: concrete_minimal_algorithm_rule_spec
+status: concrete_sparse_algorithm_rule_spec
 
 purpose: >
-  Minimal raw-feature pathways for sparse telemetry settings. This layer
+  Sparse raw-feature pathways for sparse telemetry settings. This layer
   intentionally asks: with one, two, or three trusted observable features from
   `observables/observables.yaml`, what is the strongest honest statement the
   verifier can make about possible training or training-like model development?
 
 scope_policy:
   trusted_local_inputs: "Only raw feature IDs from observables/observables.yaml are used as inputs."
-  older_catalog_policy: "Do not use old catalog files as source of truth."
-  relationship_to_training_core_rules: >
-    This file does not replace `training_core_rules_comprehensive.yaml`. It supplies minimal
-    candidate and weak-evidence pathways that can run when the full joint rules
-    lack channels. Full core rules should consume or supersede these candidates
-    when more telemetry is present.
+  relationship_to_aggregation_rules: >
+    This file supplies sparse candidate and weak-evidence pathways for the
+    public aggregation layer. Stronger warning heights come from staged joins,
+    suppressor checks, and final routing in `aggregation_rules.yaml`.
   no_hidden_feature_policy: >
-    A minimal rule's `raw_feature_budget` counts only raw observables directly
+    A sparse rule's `raw_feature_budget` counts only raw observables directly
     required by the rule. Optional strengthening or suppression channels are
     listed separately and must not be silently required for the base output.
 
-minimal_label_semantics:
+sparse_label_semantics:
   screen_only:
     meaning: "A single channel is interesting but not workload identity."
     max_confidence: screen
-    review_action: "Keep the window for joining with other minimal or full rules."
+    review_action: "Keep the window for joining with other sparse rules and aggregation."
   candidate:
     meaning: "Sparse evidence is consistent with training but materially underdetermined."
     max_confidence: weak
     review_action: "Route to review or attempt joins with support/counterevidence."
   weak_training_evidence:
-    meaning: "A minimal pair or triple includes at least one training-identity shape signal plus accelerator activity."
+    meaning: "A sparse pair or triple includes at least one training-identity shape signal plus accelerator activity."
     max_confidence: weak
     review_action: "Can seed a training-evidence candidate, but cannot become medium without an independent additional channel."
   probable_training_candidate:
@@ -44,11 +42,11 @@ minimal_label_semantics:
     max_confidence: medium
     review_action: "Require identity support before calling it training."
   suppression_or_explanation:
-    meaning: "Sparse counterevidence weakens or explains a minimal candidate."
+    meaning: "Sparse counterevidence weakens or explains a sparse candidate."
     max_confidence: not_applicable
-    review_action: "Apply before promoting any minimal candidate."
+    review_action: "Apply before promoting any sparse candidate."
 
-minimality_constraints:
+sparse_feature_constraints:
   - "No rule in this file requires more than three raw feature IDs for its base trigger."
   - "A one-feature rule may only emit `screen_only` or `large_compute_candidate`, never training identity."
   - "A two-feature rule may emit `weak_training_evidence` only if one feature is accelerator activity and the other is a training-like identity-shape channel."
@@ -56,7 +54,7 @@ minimality_constraints:
   - "Strong training evidence is out of scope for this file unless future raw observables include direct source-emitted training runtime semantics."
   - "Missing counterevidence is represented as missing; it is not treated as absence."
 
-minimal_feature_classes:
+sparse_feature_classes:
   context:
     allocation_or_running:
       - allocated_accelerator_count_by_sku
@@ -90,7 +88,7 @@ minimal_feature_classes:
       - accelerator_count_by_family_sku
       - advertised_peak_rate_by_precision
 
-minimal_rule_categories:
+rule_categories:
   - id: large_compute_scale
     name: Large compute / scale
     algorithm_treatment: >
@@ -101,7 +99,7 @@ minimal_rule_categories:
     confidence_policy:
       max_standalone_confidence: medium
       can_emit_training_label_by_itself: false
-      promotion_requirement: "Join with fabric_parameter_update_like, storage_checkpoint_state_like, or comprehensive core evidence."
+      promotion_requirement: "Join with fabric_parameter_update_like, storage_checkpoint_state_like, or another independent identity channel."
     rule_ids:
       - large_compute_screen
       - ops_fabric_training_candidate
@@ -146,7 +144,7 @@ minimal_rule_categories:
     confidence_policy:
       max_standalone_confidence: medium
       can_emit_training_label_by_itself: weak_only
-      promotion_requirement: "Join with context/activity and suppressors; comprehensive rules are required for strong labels."
+      promotion_requirement: "Join with context/activity and suppressors before stronger warning heights."
     rule_ids:
       - activity_fabric_cadence_candidate
       - allocated_activity_fabric_training_candidate
@@ -162,7 +160,7 @@ minimal_rule_categories:
     confidence_policy:
       max_standalone_confidence: medium
       can_emit_training_label_by_itself: weak_only
-      promotion_requirement: "Join with activity/context and storage-operation suppressors; comprehensive rules are required for strong labels."
+      promotion_requirement: "Join with activity/context and storage-operation suppressors before stronger warning heights."
     rule_ids:
       - activity_checkpoint_candidate
       - allocated_activity_checkpoint_training_candidate
@@ -188,7 +186,7 @@ minimal_rule_categories:
       Apply before promotion. These rules weaken, suppress, or explain sparse
       positive candidates and should be retained in the output as explicit
       counterevidence.
-    evidentiary_statement: "Serving, storage operations, or benchmark-like patterns explain or weaken a minimal training candidate."
+    evidentiary_statement: "Serving, storage operations, or benchmark-like patterns explain or weaken a sparse training candidate."
     confidence_policy:
       max_standalone_confidence: not_applicable
       can_emit_training_label_by_itself: false
@@ -198,7 +196,7 @@ minimal_rule_categories:
       - storage_operation_suppression
       - benchmark_like_suppression
 
-minimal_rule_category_membership:
+rule_category_membership:
   membership_policy: >
     Categories are evidentiary roles, not a strict partition. A rule may appear
     in multiple categories when it makes more than one algorithmically relevant
@@ -269,8 +267,8 @@ minimal_rule_category_membership:
       primary_category: capacity_physical_possibility
       additional_categories: []
 
-minimal_score_definitions:
-  - id: minimal_activity_score
+sparse_score_definitions:
+  - id: sparse_activity_score
     raw_feature_options:
       - tensor_matrix_mxu_neuron_or_engine_active_fraction
       - generic_achieved_operation_rate
@@ -286,7 +284,7 @@ minimal_score_definitions:
     missing_data_behavior: "One activity channel is enough to produce a screen, but not enough to classify training."
     source_refs: [S07, S08, S36, S37, S38, S39]
 
-  - id: minimal_fabric_cadence_score
+  - id: sparse_fabric_cadence_score
     raw_feature_options:
       - scaleout_port_tx_rx_bytes_packets
       - local_interconnect_tx_rx_bytes
@@ -300,7 +298,7 @@ minimal_score_definitions:
     missing_data_behavior: "Fabric cadence without accelerator activity is a distributed-workload screen, not training evidence."
     source_refs: [S11, S15, S16, S17, S25, S42, S43]
 
-  - id: minimal_checkpoint_write_score
+  - id: sparse_checkpoint_write_score
     raw_feature_options:
       - storage_write_operation_bytes
       - object_storage_operation_counts
@@ -313,7 +311,7 @@ minimal_score_definitions:
     missing_data_behavior: "Checkpoint-like writes without accelerator activity are storage candidates or discrepancies, not training evidence."
     source_refs: [S31, S32, S33, S45, S46, S47]
 
-  - id: minimal_non_serving_score
+  - id: sparse_non_serving_score
     raw_feature_options:
       - load_balancer_gateway_flow_activity
       - north_south_external_egress
@@ -327,11 +325,11 @@ minimal_score_definitions:
     missing_data_behavior: "Missing serving telemetry cannot strengthen a candidate."
     source_refs: [S27, S28, S29, S30, S34]
 
-minimal_training_core_rules:
+training_core_rules:
   - id: activity_only_screen
     purpose: sparse_activity_screen
     raw_feature_budget: 1
-    minimal_required_feature_sets:
+    required_feature_sets:
       any_one_of:
         - [tensor_matrix_mxu_neuron_or_engine_active_fraction]
         - [generic_achieved_operation_rate]
@@ -346,7 +344,7 @@ minimal_training_core_rules:
       evaluation_window: single_activity_channel_window
       conditions:
         all:
-          - metric: minimal_activity_score
+          - metric: sparse_activity_score
             op: ">="
             value_ref: min_activity_screen_score
           - metric: activity_duration_seconds
@@ -380,7 +378,7 @@ minimal_training_core_rules:
           unit: fraction
           evidence_status: source_informed
           source_refs: [S07, S08, S36, S37, S38, S39]
-          rationale: "Sparse minimal rules should still require most of the single channel to be covered."
+          rationale: "Sparse sparse rules should still require most of the single channel to be covered."
           counterevidence_or_failure_modes:
             - "sample gaps can hide or fabricate sustained activity windows"
           calibration_note: "Replace with telemetry source coverage."
@@ -393,7 +391,7 @@ minimal_training_core_rules:
   - id: large_compute_screen
     purpose: sparse_large_compute_candidate
     raw_feature_budget: 1
-    minimal_required_feature_sets:
+    required_feature_sets:
       any_one_of:
         - [generic_achieved_operation_rate]
     emitted_statement:
@@ -442,7 +440,7 @@ minimal_training_core_rules:
   - id: allocated_activity_candidate
     purpose: sparse_ml_compute_candidate
     raw_feature_budget: 2
-    minimal_required_feature_sets:
+    required_feature_sets:
       any_one_of:
         - [allocated_accelerator_count_by_sku, tensor_matrix_mxu_neuron_or_engine_active_fraction]
         - [allocated_accelerator_count_by_sku, generic_achieved_operation_rate]
@@ -460,7 +458,7 @@ minimal_training_core_rules:
           - metric: allocation_activity_overlap_fraction
             op: ">="
             value_ref: min_context_activity_overlap_fraction
-          - metric: minimal_activity_score
+          - metric: sparse_activity_score
             op: ">="
             value_ref: min_context_activity_score
           - metric: allocation_or_activity_window_duration_seconds
@@ -472,7 +470,7 @@ minimal_training_core_rules:
           unit: fraction
           evidence_status: calibration_default
           source_refs: [S18, S19, S20, S07, S08, S36, S37, S38, S39]
-          rationale: "Activity should overlap the allocation for most of the minimal window."
+          rationale: "Activity should overlap the allocation for most of the sparse window."
           counterevidence_or_failure_modes:
             - "clock drift, accounting delay, or preemption can lower overlap"
           calibration_note: "Tune by scheduler accounting and activity scrape timing."
@@ -503,7 +501,7 @@ minimal_training_core_rules:
   - id: running_activity_candidate
     purpose: sparse_ml_compute_candidate
     raw_feature_budget: 2
-    minimal_required_feature_sets:
+    required_feature_sets:
       any_one_of:
         - [compute_running_intervals, tensor_matrix_mxu_neuron_or_engine_active_fraction]
         - [compute_running_intervals, generic_achieved_operation_rate]
@@ -521,7 +519,7 @@ minimal_training_core_rules:
           - metric: running_activity_overlap_fraction
             op: ">="
             value_ref: min_context_activity_overlap_fraction
-          - metric: minimal_activity_score
+          - metric: sparse_activity_score
             op: ">="
             value_ref: min_context_activity_score
           - metric: running_activity_duration_seconds
@@ -564,7 +562,7 @@ minimal_training_core_rules:
   - id: activity_fabric_cadence_candidate
     purpose: sparse_distributed_training_like_candidate
     raw_feature_budget: 2
-    minimal_required_feature_sets:
+    required_feature_sets:
       any_one_of:
         - [tensor_matrix_mxu_neuron_or_engine_active_fraction, scaleout_port_tx_rx_bytes_packets]
         - [generic_achieved_operation_rate, scaleout_port_tx_rx_bytes_packets]
@@ -582,10 +580,10 @@ minimal_training_core_rules:
       evaluation_window: activity_fabric_overlap_window
       conditions:
         all:
-          - metric: minimal_activity_score
+          - metric: sparse_activity_score
             op: ">="
             value_ref: min_activity_for_fabric_pair
-          - metric: minimal_fabric_cadence_score
+          - metric: sparse_fabric_cadence_score
             op: ">="
             value_ref: min_fabric_cadence_pair_score
           - metric: activity_fabric_overlap_fraction
@@ -626,7 +624,7 @@ minimal_training_core_rules:
           unit: fraction
           evidence_status: calibration_default
           source_refs: [S11, S12, S13, S14, S15, S16, S17]
-          rationale: "The two minimal channels should overlap materially in time."
+          rationale: "The two sparse channels should overlap materially in time."
           counterevidence_or_failure_modes:
             - "coarse aggregation can create false overlap"
           calibration_note: "Tune by source timestamps and clock drift."
@@ -649,7 +647,7 @@ minimal_training_core_rules:
   - id: activity_checkpoint_candidate
     purpose: sparse_checkpoint_training_like_candidate
     raw_feature_budget: 2
-    minimal_required_feature_sets:
+    required_feature_sets:
       any_one_of:
         - [tensor_matrix_mxu_neuron_or_engine_active_fraction, storage_write_operation_bytes]
         - [generic_achieved_operation_rate, storage_write_operation_bytes]
@@ -670,10 +668,10 @@ minimal_training_core_rules:
       evaluation_window: activity_checkpoint_adjacency_window
       conditions:
         all:
-          - metric: minimal_activity_score
+          - metric: sparse_activity_score
             op: ">="
             value_ref: min_activity_for_checkpoint_pair
-          - metric: minimal_checkpoint_write_score
+          - metric: sparse_checkpoint_write_score
             op: ">="
             value_ref: min_checkpoint_pair_score
           - metric: checkpoint_activity_overlap_or_adjacency_fraction
@@ -736,7 +734,7 @@ minimal_training_core_rules:
   - id: activity_nonserving_candidate
     purpose: sparse_nonserving_compute_candidate
     raw_feature_budget: 2
-    minimal_required_feature_sets:
+    required_feature_sets:
       any_one_of:
         - [tensor_matrix_mxu_neuron_or_engine_active_fraction, load_balancer_gateway_flow_activity]
         - [generic_achieved_operation_rate, load_balancer_gateway_flow_activity]
@@ -757,10 +755,10 @@ minimal_training_core_rules:
       evaluation_window: activity_network_overlap_window
       conditions:
         all:
-          - metric: minimal_activity_score
+          - metric: sparse_activity_score
             op: ">="
             value_ref: min_activity_for_nonserving_pair
-          - metric: minimal_non_serving_score
+          - metric: sparse_non_serving_score
             op: ">="
             value_ref: min_non_serving_pair_score
           - metric: serving_channel_coverage_fraction
@@ -802,9 +800,9 @@ minimal_training_core_rules:
     false_positive_risk: high_for_training_identity
 
   - id: allocated_activity_fabric_training_candidate
-    purpose: minimal_distributed_training_evidence
+    purpose: sparse_distributed_training_evidence
     raw_feature_budget: 3
-    minimal_required_feature_sets:
+    required_feature_sets:
       any_one_of:
         - [allocated_accelerator_count_by_sku, tensor_matrix_mxu_neuron_or_engine_active_fraction, scaleout_port_tx_rx_bytes_packets]
         - [allocated_accelerator_count_by_sku, generic_achieved_operation_rate, scaleout_port_tx_rx_bytes_packets]
@@ -813,7 +811,7 @@ minimal_training_core_rules:
         - [allocated_accelerator_count_by_sku, generic_achieved_operation_rate, fabric_port_device_sample_counters]
         - [allocated_accelerator_count_by_sku, accelerator_busy_or_utilization_fraction, fabric_port_device_sample_counters]
     emitted_statement:
-      label: minimal_distributed_training_candidate
+      label: sparse_distributed_training_candidate
       label_semantics: probable_training_candidate
       max_confidence: medium
       statement: "Allocation, accelerator activity, and collective-like fabric cadence align; distributed training or training-like model development is plausible."
@@ -825,10 +823,10 @@ minimal_training_core_rules:
           - metric: allocation_activity_fabric_overlap_fraction
             op: ">="
             value_ref: min_three_way_overlap_fraction
-          - metric: minimal_activity_score
+          - metric: sparse_activity_score
             op: ">="
             value_ref: min_three_feature_activity_score
-          - metric: minimal_fabric_cadence_score
+          - metric: sparse_fabric_cadence_score
             op: ">="
             value_ref: min_three_feature_fabric_cadence_score
           - metric: allocated_participant_count
@@ -877,7 +875,7 @@ minimal_training_core_rules:
           unit: participants
           evidence_status: calibration_default
           source_refs: [S18, S19, S20, S23, S24]
-          rationale: "A minimal distributed-training candidate should involve more than a tiny local footprint."
+          rationale: "A sparse distributed-training candidate should involve more than a tiny local footprint."
           counterevidence_or_failure_modes:
             - "small real training can be below this; large non-training jobs can exceed it"
           calibration_note: "Tune by local training and non-training allocation sizes."
@@ -897,9 +895,9 @@ minimal_training_core_rules:
     false_positive_risk: medium
 
   - id: running_activity_fabric_training_candidate
-    purpose: minimal_distributed_training_evidence
+    purpose: sparse_distributed_training_evidence
     raw_feature_budget: 3
-    minimal_required_feature_sets:
+    required_feature_sets:
       any_one_of:
         - [compute_running_intervals, tensor_matrix_mxu_neuron_or_engine_active_fraction, scaleout_port_tx_rx_bytes_packets]
         - [compute_running_intervals, generic_achieved_operation_rate, scaleout_port_tx_rx_bytes_packets]
@@ -908,7 +906,7 @@ minimal_training_core_rules:
         - [compute_running_intervals, generic_achieved_operation_rate, fabric_port_device_sample_counters]
         - [compute_running_intervals, accelerator_busy_or_utilization_fraction, fabric_port_device_sample_counters]
     emitted_statement:
-      label: minimal_distributed_training_candidate
+      label: sparse_distributed_training_candidate
       label_semantics: probable_training_candidate
       max_confidence: medium
       statement: "Running accelerator compute, accelerator activity, and collective-like fabric cadence align; distributed training or training-like model development is plausible."
@@ -920,10 +918,10 @@ minimal_training_core_rules:
           - metric: running_activity_fabric_overlap_fraction
             op: ">="
             value_ref: min_three_way_overlap_fraction
-          - metric: minimal_activity_score
+          - metric: sparse_activity_score
             op: ">="
             value_ref: min_three_feature_activity_score
-          - metric: minimal_fabric_cadence_score
+          - metric: sparse_fabric_cadence_score
             op: ">="
             value_ref: min_three_feature_fabric_cadence_score
           - metric: running_accelerator_count
@@ -965,7 +963,7 @@ minimal_training_core_rules:
           unit: participants
           evidence_status: calibration_default
           source_refs: [S23, S24]
-          rationale: "A minimal distributed candidate should involve a multi-accelerator running footprint."
+          rationale: "A sparse distributed candidate should involve a multi-accelerator running footprint."
           counterevidence_or_failure_modes:
             - "small real training can be below this; large non-training jobs can exceed it"
           calibration_note: "Tune by local cloud workload sizes."
@@ -985,9 +983,9 @@ minimal_training_core_rules:
     false_positive_risk: medium
 
   - id: allocated_activity_checkpoint_training_candidate
-    purpose: minimal_checkpoint_training_evidence
+    purpose: sparse_checkpoint_training_evidence
     raw_feature_budget: 3
-    minimal_required_feature_sets:
+    required_feature_sets:
       any_one_of:
         - [allocated_accelerator_count_by_sku, tensor_matrix_mxu_neuron_or_engine_active_fraction, storage_write_operation_bytes]
         - [allocated_accelerator_count_by_sku, generic_achieved_operation_rate, storage_write_operation_bytes]
@@ -996,7 +994,7 @@ minimal_training_core_rules:
         - [allocated_accelerator_count_by_sku, generic_achieved_operation_rate, object_storage_operation_counts]
         - [allocated_accelerator_count_by_sku, accelerator_busy_or_utilization_fraction, object_storage_operation_counts]
     emitted_statement:
-      label: minimal_checkpoint_training_candidate
+      label: sparse_checkpoint_training_candidate
       label_semantics: probable_training_candidate
       max_confidence: medium
       statement: "Allocation, accelerator activity, and repeated checkpoint-like writes align; training-like model-state updates are plausible."
@@ -1008,10 +1006,10 @@ minimal_training_core_rules:
           - metric: allocation_activity_checkpoint_overlap_or_adjacency_fraction
             op: ">="
             value_ref: min_checkpoint_three_way_adjacency_fraction
-          - metric: minimal_activity_score
+          - metric: sparse_activity_score
             op: ">="
             value_ref: min_checkpoint_three_feature_activity_score
-          - metric: minimal_checkpoint_write_score
+          - metric: sparse_checkpoint_write_score
             op: ">="
             value_ref: min_checkpoint_three_feature_score
           - metric: checkpoint_write_burst_count
@@ -1070,7 +1068,7 @@ minimal_training_core_rules:
   - id: ops_fabric_training_candidate
     purpose: sparse_large_compute_with_identity_candidate
     raw_feature_budget: 2
-    minimal_required_feature_sets:
+    required_feature_sets:
       any_one_of:
         - [generic_achieved_operation_rate, scaleout_port_tx_rx_bytes_packets]
         - [generic_achieved_operation_rate, fabric_port_device_sample_counters]
@@ -1091,7 +1089,7 @@ minimal_training_core_rules:
           - metric: operation_unit_normalized
             op: "=="
             value: true
-          - metric: minimal_fabric_cadence_score
+          - metric: sparse_fabric_cadence_score
             op: ">="
             value_ref: min_large_compute_fabric_cadence_score
           - metric: achieved_ops_fabric_overlap_fraction
@@ -1112,7 +1110,7 @@ minimal_training_core_rules:
           unit: score_0_to_1
           evidence_status: mechanism_inferred
           source_refs: [S11, S12, S13, S14, S15, S16, S17]
-          rationale: "Fabric cadence provides a minimal training-like identity shape for policy-scale compute."
+          rationale: "Fabric cadence provides a sparse training-like identity shape for policy-scale compute."
           counterevidence_or_failure_modes:
             - "HPC/MPI, NCCL tests, and distributed inference can pass"
           calibration_note: "Calibrate with known large-compute workloads."
@@ -1135,7 +1133,7 @@ minimal_training_core_rules:
   - id: ops_checkpoint_training_candidate
     purpose: sparse_large_compute_with_identity_candidate
     raw_feature_budget: 2
-    minimal_required_feature_sets:
+    required_feature_sets:
       any_one_of:
         - [generic_achieved_operation_rate, storage_write_operation_bytes]
         - [generic_achieved_operation_rate, object_storage_operation_counts]
@@ -1156,7 +1154,7 @@ minimal_training_core_rules:
           - metric: operation_unit_normalized
             op: "=="
             value: true
-          - metric: minimal_checkpoint_write_score
+          - metric: sparse_checkpoint_write_score
             op: ">="
             value_ref: min_large_compute_checkpoint_score
           - metric: checkpoint_write_burst_count
@@ -1177,7 +1175,7 @@ minimal_training_core_rules:
           unit: score_0_to_1
           evidence_status: source_informed
           source_refs: [S31, S32, S33, S45, S46, S47]
-          rationale: "Checkpoint-like writes are a minimal model-state identity shape when paired with large achieved compute."
+          rationale: "Checkpoint-like writes are a sparse model-state identity shape when paired with large achieved compute."
           counterevidence_or_failure_modes:
             - "backup, replication, ETL, and generated data can pass"
           calibration_note: "Calibrate with large-compute storage traces."
@@ -1200,7 +1198,7 @@ minimal_training_core_rules:
   - id: serving_suppression
     purpose: sparse_false_positive_filter
     raw_feature_budget: 2
-    minimal_required_feature_sets:
+    required_feature_sets:
       any_one_of:
         - [tensor_matrix_mxu_neuron_or_engine_active_fraction, load_balancer_gateway_flow_activity]
         - [generic_achieved_operation_rate, load_balancer_gateway_flow_activity]
@@ -1214,13 +1212,13 @@ minimal_training_core_rules:
     emitted_statement:
       label: serving_like_activity_explanation
       label_semantics: suppression_or_explanation
-      statement: "High accelerator activity overlaps serving-like network shape; suppress minimal training candidates unless another identity channel remains strong."
+      statement: "High accelerator activity overlaps serving-like network shape; suppress sparse training candidates unless another identity channel remains strong."
     trigger:
       type: two_feature_suppression_logic
       evaluation_window: activity_serving_overlap_window
       conditions:
         all:
-          - metric: minimal_activity_score
+          - metric: sparse_activity_score
             op: ">="
             value_ref: min_activity_for_serving_suppression
           - metric: serving_counterevidence_score
@@ -1266,7 +1264,7 @@ minimal_training_core_rules:
   - id: storage_operation_suppression
     purpose: sparse_false_positive_filter
     raw_feature_budget: 2
-    minimal_required_feature_sets:
+    required_feature_sets:
       any_one_of:
         - [storage_write_operation_bytes, storage_operation_intervals]
         - [object_storage_operation_counts, storage_operation_intervals]
@@ -1341,7 +1339,7 @@ minimal_training_core_rules:
   - id: benchmark_like_suppression
     purpose: sparse_false_positive_filter
     raw_feature_budget: 2
-    minimal_required_feature_sets:
+    required_feature_sets:
       any_one_of:
         - [tensor_matrix_mxu_neuron_or_engine_active_fraction, scaleout_port_tx_rx_bytes_packets]
         - [generic_achieved_operation_rate, scaleout_port_tx_rx_bytes_packets]
@@ -1358,7 +1356,7 @@ minimal_training_core_rules:
       evaluation_window: activity_fabric_overlap_window
       conditions:
         all:
-          - metric: minimal_fabric_cadence_score
+          - metric: sparse_fabric_cadence_score
             op: ">="
             value_ref: min_benchmark_like_cadence_score
           - metric: benchmark_regularity_score
@@ -1367,7 +1365,7 @@ minimal_training_core_rules:
           - metric: paired_window_duration_seconds
             op: "<="
             value_ref: max_benchmark_like_duration_seconds
-          - metric: minimal_checkpoint_write_score
+          - metric: sparse_checkpoint_write_score
             op: "<="
             value_ref: max_checkpoint_score_for_benchmark_suppression
             missing_behavior: pass_with_missing_qualifier
@@ -1417,7 +1415,7 @@ minimal_training_core_rules:
   - id: capacity_threshold_possible
     purpose: sparse_capacity_context
     raw_feature_budget: 2
-    minimal_required_feature_sets:
+    required_feature_sets:
       any_one_of:
         - [accelerator_count_by_family_sku, advertised_peak_rate_by_precision]
     emitted_statement:
@@ -1430,12 +1428,12 @@ minimal_training_core_rules:
       evaluation_window: capacity_validity_window
       conditions:
         all:
-          - metric: minimal_capacity_upper_bound_operations
+          - metric: sparse_capacity_upper_bound_operations
             op: ">="
             value_ref: policy_threshold_operations
           - metric: capacity_input_coverage_fraction
             op: ">="
-            value_ref: min_minimal_capacity_coverage_fraction
+            value_ref: min_sparse_capacity_coverage_fraction
       calibration_defaults:
         - name: policy_threshold_operations
           value: 1.0e25
@@ -1446,12 +1444,12 @@ minimal_training_core_rules:
           counterevidence_or_failure_modes:
             - "capacity is not activity"
           calibration_note: "Replace only if policy changes."
-        - name: min_minimal_capacity_coverage_fraction
+        - name: min_sparse_capacity_coverage_fraction
           value: 0.80
           unit: fraction
           evidence_status: calibration_default
           source_refs: [S04, S05, S06, S24]
-          rationale: "Minimal capacity screen still needs coverage of count and peak-rate validity."
+          rationale: "Sparse capacity screen still needs coverage of count and peak-rate validity."
           counterevidence_or_failure_modes:
             - "missing caps, health, installation, or topology can overstate usable capacity"
           calibration_note: "Full capacity rules should supersede this screen when available."
@@ -1463,29 +1461,29 @@ minimal_training_core_rules:
   - id: capacity_threshold_ruled_out
     purpose: sparse_capacity_context
     raw_feature_budget: 2
-    minimal_required_feature_sets:
+    required_feature_sets:
       any_one_of:
         - [accelerator_count_by_family_sku, advertised_peak_rate_by_precision]
     emitted_statement:
-      label: threshold_scale_capacity_not_supported_minimal
+      label: threshold_scale_capacity_not_supported_sparse
       label_semantics: screen_only
       max_confidence: weak
-      statement: "Minimal installed/provisioned capacity upper bound is below the policy threshold; this is weak no-capacity support unless full availability and service channels are covered."
+      statement: "Sparse installed/provisioned capacity upper bound is below the policy threshold; this is weak no-capacity support unless full availability and service channels are covered."
     trigger:
       type: two_feature_capacity_screen_logic
       evaluation_window: capacity_validity_window
       conditions:
         all:
-          - metric: minimal_capacity_upper_bound_operations
+          - metric: sparse_capacity_upper_bound_operations
             op: "<"
             value_ref: policy_threshold_operations
           - metric: capacity_input_coverage_fraction
             op: ">="
-            value_ref: min_minimal_capacity_coverage_fraction_for_ruleout
+            value_ref: min_sparse_capacity_coverage_fraction_for_ruleout
       confidence_cap_rules:
         - condition: "No availability, health, partition, service, or cloud-running feature is present"
           cap: weak
-          output_qualifier: minimal_upper_bound_only
+          output_qualifier: sparse_upper_bound_only
       calibration_defaults:
         - name: policy_threshold_operations
           value: 1.0e25
@@ -1496,7 +1494,7 @@ minimal_training_core_rules:
           counterevidence_or_failure_modes:
             - "hidden or unmonitored capacity can invalidate a sparse rule-out"
           calibration_note: "Replace only if policy changes."
-        - name: min_minimal_capacity_coverage_fraction_for_ruleout
+        - name: min_sparse_capacity_coverage_fraction_for_ruleout
           value: 0.95
           unit: fraction
           evidence_status: calibration_default
@@ -1504,23 +1502,23 @@ minimal_training_core_rules:
           rationale: "Sparse capacity rule-out requires near-complete count and peak-rate coverage."
           counterevidence_or_failure_modes:
             - "missing instance/inventory scope can understate capacity"
-          calibration_note: "Use full capability rules for strong rule-out claims."
+          calibration_note: "Use derived capacity bounds and aggregation gates for strong rule-out claims."
     cannot_conclude:
       - no_training
       - no_large_compute_when_activity_channels_are_missing
 
-minimal_promotion_policy:
-  promote_to_training_core_rules_when_available:
-    - "If allocation/running, accelerator activity, fabric cadence, and serving counterevidence are all present, evaluate `collective_cadence_training` in training_core_rules_comprehensive.yaml."
-    - "If allocation/running, accelerator activity, checkpoint-like writes, and storage-operation counterevidence are present, evaluate `checkpoint_training_signature` in training_core_rules_comprehensive.yaml."
-    - "If achieved operations cross the policy threshold and any identity-shape channel is present, evaluate `achieved_ops_training_candidate` in training_core_rules_comprehensive.yaml."
+sparse_promotion_policy:
+  promote_to_aggregation_when_available:
+    - "If allocation/running, accelerator activity, fabric cadence, and serving counterevidence are all present, evaluate distributed-training-like aggregation."
+    - "If allocation/running, accelerator activity, checkpoint-like writes, and storage-operation counterevidence are present, evaluate checkpoint-training-like aggregation."
+    - "If achieved operations cross the policy threshold and any identity-shape channel is present, evaluate sparse-large-compute aggregation."
   do_not_promote_when:
     - "The only positive signal is capacity."
     - "The only positive signal is accelerator activity."
-    - "Serving, storage-operation, benchmark, or HPC suppressors explain the minimal signal."
+    - "Serving, storage-operation, benchmark, or HPC suppressors explain the sparse signal."
     - "Primary source coverage is unknown and the candidate depends on absence of counterevidence."
 
-minimal_output_fields:
+output_fields:
   required_for_every_rule:
     - rule_id
     - raw_feature_budget
