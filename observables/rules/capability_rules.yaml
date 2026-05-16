@@ -1,0 +1,506 @@
+schema_version: "0.2"
+created: "2026-05-16"
+source_inventory: observables/observables.yaml
+status: concrete_algorithm_rule_spec
+
+capability_policy:
+  policy_threshold_operations:
+    value: 1.0e25
+    unit: operations
+    evidence_status: source_backed
+    source_refs: [S01, S03]
+    rationale: "Policy review scale for large compute; not a workload identity classifier."
+    counterevidence_or_failure_modes:
+      - "large inference, synthetic data generation, benchmarks, and HPC can cross the same compute threshold"
+    calibration_note: "Replace only when the governing policy threshold changes."
+  comparison_uncertainty_margin:
+    value: 0.10
+    unit: ratio
+    evidence_status: calibration_default
+    source_refs: [S04, S05, S06, S07, S08, S09, S24]
+    rationale: "Executable default for unit, clock, aggregation, and scope uncertainty in capacity comparisons."
+    counterevidence_or_failure_modes:
+      - "operation-unit mismatch or hidden capacity can dominate this margin"
+    calibration_note: "Replace with source-specific measurement uncertainty."
+  positive_activity_policy: >
+    Advertised peak rates may be used for conservative capacity upper bounds.
+    They must not be used as positive achieved-work lower bounds unless the
+    rule explicitly marks the result as a calibrated activity proxy.
+
+capability_rules:
+  - id: cap_capacity_upper_bound_flop
+    purpose: capacity_upper_bound
+    required_features:
+      - accelerator_count_by_family_sku
+      - advertised_peak_rate_by_precision
+    optional_features:
+      - instance_type_shape_machine_type
+      - allocated_accelerator_count_by_sku
+      - compute_running_intervals
+      - accelerator_compute_billing_usage_intervals
+      - accelerator_partitioning_intervals
+      - accelerator_power_cap_watts
+      - accelerator_core_clock_hz
+      - accelerator_memory_clock_hz
+      - accelerator_p_state
+      - accelerator_throttle_state
+      - accelerator_performance_limit_state
+      - accelerator_power_limit_active
+      - accelerator_thermal_limit_active
+      - accelerator_health_error_state
+      - maintenance_operation_intervals
+      - utility_interconnection_status_intervals
+      - electrical_service_status_intervals
+      - asset_receiving_installation_events
+    derived_signals:
+      - capacity_upper_bound_flop
+      - available_accelerator_fraction
+      - cap_clock_power_factor
+      - clock_aligned_overlap_window
+    time_alignment: "Integrate only over windows where inventory/shape, peak rate, availability, and physical service validity overlap."
+    formula: >
+      C_capacity_upper(W) = integral_W sum_sku count_sku(t) *
+      R_peak_sku_precision(t) * available_accelerator_fraction_sku(t) *
+      cap_clock_power_factor_sku(t) dt.
+    concrete_computation:
+      type: interval_integration_upper_bound
+      source_refs: [S01, S03, S04, S05, S06, S07, S08, S09, S23, S24, S26, S35, S40, S41]
+      evidence_status: source_informed
+      time_segmentation:
+        split_at:
+          - inventory_count_validity_boundary
+          - advertised_peak_rate_validity_boundary
+          - partition_interval_boundary
+          - power_cap_or_clock_sample_boundary
+          - health_or_throttle_state_boundary
+          - topology_or_maintenance_boundary
+          - cloud_running_quota_or_reservation_boundary
+          - electrical_service_or_installation_boundary
+      per_segment_formula: |
+        segment_capacity_operations =
+          segment_seconds *
+          sum_sku_precision(
+            effective_count_sku *
+            advertised_peak_rate_by_precision_ops_per_second *
+            available_accelerator_fraction *
+            cap_clock_power_factor *
+            topology_domain_factor *
+            cloud_or_service_scope_factor
+          )
+        capacity_upper_bound_operations = sum(segment_capacity_operations)
+      validation_checks:
+        - "Peak rate must be source-backed for the exact SKU/instance type and precision_or_mode; otherwise emit missing_peak_rate and exclude strong negative conclusions."
+        - "available_accelerator_fraction must be computed on the same monitored scope as the claim or audit window."
+        - "cap_clock_power_factor may reduce capacity only for intervals where caps, clocks, or limit states overlap the segment."
+        - "cloud quotas and reservations cap capacity only when enforced and scope-matched."
+        - "electrical and installation constraints can set available fraction to zero before commissioning/energized service unless alternate capacity is documented."
+      output_constraints:
+        - "This is an upper bound for ruling out or sanity-checking claims, not evidence that work occurred."
+        - "Do not multiply advertised peak by utilization to create a strong achieved lower bound unless the proxy is calibrated and labeled."
+      comparison_defaults:
+        - name: policy_threshold_operations
+          value: 1.0e25
+          unit: operations
+          evidence_status: source_backed
+          source_refs: [S01, S03]
+          rationale: "Policy threshold used for large-compute review."
+          counterevidence_or_failure_modes: ["the threshold does not classify workload type"]
+          calibration_note: "Replace only if policy changes."
+        - name: exceedance_uncertainty_margin
+          value: 0.10
+          unit: ratio
+          evidence_status: calibration_default
+          source_refs: [S04, S05, S06, S07, S08, S09, S24]
+          rationale: "Default margin for flagging achieved/claimed compute above capacity."
+          counterevidence_or_failure_modes: ["unit mismatch, aggregation, and hidden capacity can exceed this"]
+          calibration_note: "Replace with source-specific uncertainty."
+        - name: unknown_cap_clock_power_factor_for_upper_bound
+          value: 1.0
+          unit: fraction
+          evidence_status: mechanism_inferred
+          source_refs: [S07, S08, S09]
+          rationale: "Unknown caps are not assumed to reduce an upper bound."
+          counterevidence_or_failure_modes: ["undocumented caps can make the upper bound too high"]
+          calibration_note: "Replace with measured cap/clock source completeness."
+        - name: default_topology_domain_factor_for_upper_bound
+          value: 1.0
+          unit: fraction
+          evidence_status: calibration_default
+          source_refs: [S11, S15, S16, S17, S25, S42, S43]
+          rationale: "If topology constraints are unknown, retain capacity upper bound but do not issue strong synchronized-training feasibility claims."
+          counterevidence_or_failure_modes: ["unusable topology can overstate synchronized training feasibility"]
+          calibration_note: "Replace with topology-specific effective domain factor."
+        - name: sustained_efficiency_factor_for_positive_proxy
+          value: 0.0
+          unit: fraction
+          evidence_status: project_assumption
+          source_refs: [S07, S08, S36, S37, S38, S39]
+          rationale: "Default forbids deriving positive achieved work from advertised peak without site calibration."
+          counterevidence_or_failure_modes: ["proxy lower bounds may be useful after calibration but are intentionally disabled by default"]
+          calibration_note: "Set only from measured achieved operation counters or validated workload-specific efficiency curves."
+      trigger:
+        type: capacity_bound_threshold_logic
+        evaluation_window: audited_capacity_window
+        conditions:
+          all:
+            - metric: capacity_upper_bound_flop.coverage_fraction
+              op: ">="
+              value_ref: min_capacity_input_coverage_fraction
+            - metric: capacity_upper_bound_flop.capacity_upper_bound_operations
+              op: "<"
+              value_ref: policy_threshold_operations
+        output_label: threshold_scale_run_physically_ruled_out_for_scope
+        confidence: conservative_bound
+      calibration_defaults:
+        - name: min_capacity_input_coverage_fraction
+          value: 0.90
+          unit: fraction
+          evidence_status: calibration_default
+          source_refs: [S07, S08, S09, S18, S23, S26, S35, S40, S41]
+          rationale: "Negative capacity conclusions require high coverage of capacity inputs."
+          counterevidence_or_failure_modes: ["missing inventory, quota, or service data can understate capacity"]
+          calibration_note: "Replace with source completeness requirements for the monitored scope."
+    output_fields:
+      - monitored_scope
+      - start_time
+      - end_time
+      - precision_or_mode
+      - capacity_upper_bound_operations
+      - limiting_features
+      - confidence
+    confidence_label: conservative_bound
+    source_refs: [S01, S03, S04, S05, S06, S07, S08, S09, S24]
+
+  - id: cap_accelerator_sku_capability
+    purpose: hardware_capability_lookup
+    required_features:
+      - accelerator_count_by_family_sku
+    optional_features:
+      - instance_type_shape_machine_type
+      - memory_capacity_bytes
+      - memory_bandwidth_bytes_per_sec
+      - advertised_peak_rate_by_precision
+      - local_accelerator_interconnect_domain
+      - scaleout_fabric_domain_graph
+    derived_signals: []
+    time_alignment: "Use capability values whose validity intervals overlap the audited scope/window."
+    formula: >
+      Normalize physical inventory and cloud shapes to SKU, memory class,
+      advertised precision/mode rates, local fabric capability, and scale-out
+      fabric domain membership. Do not infer activity from capability.
+    output_fields:
+      - accelerator_sku
+      - count
+      - memory_capacity_bytes
+      - memory_bandwidth_bytes_per_sec
+      - advertised_peak_rates
+      - topology_context
+      - capability_source
+    confidence_label: certain
+    source_refs: [S04, S05, S06, S07, S08, S09, S19, S20, S24]
+
+  - id: cap_partition_adjustment
+    purpose: capacity_reduction
+    required_features:
+      - accelerator_partitioning_intervals
+    optional_features:
+      - allocated_accelerator_count_by_sku
+      - container_resource_request_quantity
+      - container_resource_limit_quantity
+      - accelerator_count_by_family_sku
+      - hbm_or_device_memory_used
+    derived_signals:
+      - available_accelerator_fraction
+    time_alignment: "Apply partition profile and sharing mode only during the exact partition interval overlap."
+    formula: >
+      Map each partition profile to a calibrated fraction of compute, memory,
+      and interconnect capability. Reduce available capacity for small or shared
+      partitions and preserve the logical-to-physical mapping used by scheduler
+      or container records.
+    output_fields:
+      - partition_type
+      - slice_profile
+      - logical_partition_count
+      - compute_fraction
+      - memory_fraction
+      - visibility_caveats
+    confidence_label: conservative_bound
+    source_refs: [S10, S19, S20]
+
+  - id: cap_power_clock_limit_adjustment
+    purpose: capacity_reduction
+    required_features:
+      - accelerator_power_cap_watts
+      - accelerator_core_clock_hz
+    optional_features:
+      - accelerator_memory_clock_hz
+      - accelerator_p_state
+      - accelerator_throttle_state
+      - accelerator_performance_limit_state
+      - accelerator_power_limit_active
+      - accelerator_thermal_limit_active
+      - power_cap_violation_throttle_state
+      - accelerator_temperature_celsius
+      - inlet_outlet_air_or_coolant_temperature
+      - cooling_alarm_state
+    derived_signals:
+      - cap_clock_power_factor
+    time_alignment: "Reduce only the samples or intervals where caps, clocks, or limit states overlap the capacity window."
+    formula: >
+      Convert power caps, clocks, P-states, and active limit states into a
+      per-SKU multiplicative cap factor using site-calibrated curves. Treat
+      sustained active limits as capacity reductions and possible benign
+      explanations for reduced achieved throughput.
+    concrete_computation:
+      type: multiplicative_capacity_factor
+      source_refs: [S07, S08, S09, S40, S41]
+      evidence_status: calibration_default
+      formula: |
+        clock_factor = min(1, observed_core_clock_hz / reference_core_clock_hz)
+        power_factor = min(1, accelerator_power_cap_watts / reference_power_limit_watts)
+        active_limit_factor = min(source_or_default_limit_factor for active limit states)
+        cap_clock_power_factor = clamp(min(clock_factor, power_factor, active_limit_factor), 0, 1)
+      defaults:
+        - name: active_power_limit_factor
+          value: 0.80
+          unit: fraction
+          evidence_status: calibration_default
+          rationale: "Executable default until per-SKU power/performance curves are available."
+          counterevidence_or_failure_modes: ["active caps can be non-binding or more severe"]
+          calibration_note: "Replace with measured curves."
+        - name: active_thermal_or_throttle_factor
+          value: 0.70
+          unit: fraction
+          evidence_status: calibration_default
+          rationale: "Executable default for sustained active thermal/throttle states."
+          counterevidence_or_failure_modes: ["transient throttle states may not materially reduce throughput"]
+          calibration_note: "Calibrate by throttle duration and achieved-rate impact."
+    output_fields:
+      - cap_clock_power_factor
+      - limiting_state
+      - affected_sku
+      - affected_window
+      - calibration_source
+    confidence_label: likely
+    source_refs: [S07, S08, S09, S40, S41]
+
+  - id: cap_health_degraded_device_adjustment
+    purpose: capacity_reduction
+    required_features:
+      - accelerator_health_error_state
+    optional_features:
+      - local_link_error_recovery_throttle
+      - rdma_congestion_retry_drop_error_counters
+      - topology_change_events
+      - maintenance_operation_intervals
+      - inventory_lifecycle_events
+    derived_signals:
+      - available_accelerator_fraction
+    time_alignment: "Subtract devices or links only while degraded/error state overlaps the audited window and affected scope."
+    formula: >
+      Classify persistent degraded devices, resets, ECC/XID-like errors, retired
+      pages, or link failures as unavailable when site policy would drain or
+      remove them from service. Keep transient errors as caveats unless they
+      materially interrupt the window.
+    output_fields:
+      - affected_asset_count
+      - degraded_state
+      - unavailable_fraction
+      - explanation_category
+      - confidence
+    confidence_label: likely
+    source_refs: [S07, S08, S09, S42, S43]
+
+  - id: cap_topology_domain_constraint
+    purpose: topology_capacity_bound
+    required_features:
+      - scaleout_fabric_domain_graph
+    optional_features:
+      - local_accelerator_interconnect_domain
+      - cross_site_or_dci_connectivity
+      - topology_change_events
+      - local_link_error_recovery_throttle
+      - rdma_congestion_retry_drop_error_counters
+      - fabric_port_device_sample_counters
+      - maintenance_operation_intervals
+    derived_signals:
+      - largest_usable_topology_domain
+    time_alignment: "Split topology validity at link, route, switch, maintenance, and topology-change event times."
+    formula: >
+      Compute the largest simultaneously usable low-latency participant domain
+      and effective fabric constraints. If the domain cannot connect enough
+      accelerators at sufficient effective bandwidth for the target training
+      hypothesis, reduce the feasible capacity for synchronized training.
+    output_fields:
+      - largest_domain_accelerator_count
+      - effective_bisection_bandwidth_gbps
+      - excluded_devices_or_links
+      - topology_confidence
+    confidence_label: conservative_bound
+    source_refs: [S11, S15, S16, S17, S25, S42, S43]
+
+  - id: cap_cloud_capacity_constraint
+    purpose: provider_capacity_bound
+    required_features:
+      - instance_type_shape_machine_type
+    optional_features:
+      - compute_running_intervals
+      - capacity_reservation_intervals
+      - reservation_state_intervals
+      - quota_limit_intervals
+      - capacity_exception_events
+      - accelerator_compute_billing_usage_intervals
+      - accelerator_reservation_billing_usage_intervals
+      - container_resource_request_quantity
+      - container_resource_limit_quantity
+    derived_signals:
+      - available_accelerator_fraction
+      - telemetry_coverage_fraction
+    time_alignment: "Intersect provider shape validity, running intervals, enforced quotas, reservation windows, and billing intervals."
+    formula: >
+      Bound cloud-side capacity by instance shape, actual running state, active
+      reservations, enforced quota, capacity exceptions, and billing records.
+      Treat reservations and quotas as availability or limits, not workload
+      identity.
+    output_fields:
+      - provider_scope
+      - shape_or_sku
+      - running_accelerator_hours
+      - reserved_accelerator_hours
+      - enforced_quota_bound
+      - capacity_exception_summary
+    confidence_label: conservative_bound
+    source_refs: [S23, S24, S26, S27, S34, S35]
+
+  - id: cap_electrical_installation_timeline
+    purpose: physical_site_capacity_bound
+    required_features:
+      - electrical_service_status_intervals
+      - asset_receiving_installation_events
+    optional_features:
+      - utility_interconnection_status_intervals
+      - electrical_permit_status_intervals
+      - inventory_lifecycle_events
+      - facility_or_room_it_power_rollup
+      - rack_pdu_it_power
+      - maintenance_operation_intervals
+    derived_signals:
+      - available_accelerator_fraction
+      - capacity_upper_bound_flop
+    time_alignment: "Capacity cannot start before receipt/installation/commissioning and sufficient electrical service overlap unless alternate capacity is documented."
+    formula: >
+      Establish earliest plausible service and installation windows for the
+      monitored site. Cap physical capacity by energized service, usable IT load
+      fraction, installed assets, and commissioning state.
+    output_fields:
+      - earliest_plausible_capacity_time
+      - service_capacity_mw
+      - installed_asset_count
+      - physical_capacity_bound
+      - caveats
+    confidence_label: conservative_bound
+    source_refs: [S40, S41, S44]
+
+  - id: cap_negative_certification_inputs
+    purpose: no_threshold_run_support
+    required_features:
+      - accelerator_count_by_family_sku
+      - advertised_peak_rate_by_precision
+    optional_features:
+      - compute_running_intervals
+      - allocated_accelerator_count_by_sku
+      - generic_achieved_operation_rate
+      - tensor_matrix_mxu_neuron_or_engine_active_fraction
+      - accelerator_busy_or_utilization_fraction
+      - scaleout_port_tx_rx_bytes_packets
+      - storage_write_operation_bytes
+      - accelerator_device_power_energy
+      - rack_pdu_it_power
+    derived_signals:
+      - capacity_upper_bound_flop
+      - telemetry_coverage_fraction
+      - achieved_operation_integral
+    time_alignment: "Evaluate no-run support only over audited windows with explicit source coverage fractions."
+    formula: >
+      Support a no-threshold-run conclusion when capacity upper bound is below
+      the policy threshold, or trusted activity upper bound/lower-bound channels
+      with high coverage show no candidate windows. Never issue a strong
+      negative label when large capacity exists but primary activity channels
+      are missing or untrusted.
+    trigger:
+      type: negative_certification_threshold_logic
+      evaluation_window: audited_no_run_window
+      source_refs: [S01, S03, S27, S28, S29, S30, S31, S35]
+      conditions:
+        any:
+          - all:
+              - metric: capacity_upper_bound_flop.capacity_upper_bound_operations
+                op: "<"
+                value_ref: policy_threshold_operations
+              - metric: capacity_upper_bound_flop.coverage_fraction
+                op: ">="
+                value_ref: min_capacity_coverage_fraction
+          - all:
+              - metric: achieved_operation_integral.operation_count
+                op: "<"
+                value_ref: policy_threshold_operations
+              - metric: telemetry_coverage_fraction.primary_channel_min
+                op: ">="
+                value_ref: min_activity_coverage_fraction
+              - metric: candidate_training_window_count
+                op: "=="
+                value: 0
+        none:
+          - metric: strongest_missing_channel_score
+            op: ">="
+            value_ref: missing_channel_suppression_score
+      missing_data_behavior: "If any primary activity or capacity channel has unknown expected coverage, emit inconclusive rather than no-run."
+      confidence_mapping:
+        weak: "Some capacity/activity evidence is below threshold but important channels are incomplete."
+        medium: "Capacity upper bound or trusted activity integral is below threshold with primary coverage."
+        strong: "Capacity upper bound below threshold with high capacity input coverage and no missing primary channel."
+    calibration_defaults:
+      - name: policy_threshold_operations
+        value: 1.0e25
+        unit: operations
+        evidence_status: source_backed
+        source_refs: [S01, S03]
+        rationale: "Policy threshold for no-threshold-run evaluation."
+        counterevidence_or_failure_modes:
+          - "Threshold is a scale classifier and does not identify training."
+        calibration_note: "Replace only if policy changes."
+      - name: min_capacity_coverage_fraction
+        value: 0.90
+        unit: fraction
+        evidence_status: calibration_default
+        source_refs: [S07, S08, S09, S18, S23, S26, S35, S40, S41]
+        rationale: "Strong negative claims need high capacity coverage."
+        counterevidence_or_failure_modes:
+          - "missing inventory or service records can understate capacity"
+        calibration_note: "Tune by source coverage and scope."
+      - name: min_activity_coverage_fraction
+        value: 0.90
+        unit: fraction
+        evidence_status: source_informed
+        source_refs: [S07, S08, S27, S28, S29, S30, S31, S35, S36, S37, S38, S39]
+        rationale: "No-activity or no-candidate claims require high primary telemetry coverage."
+        counterevidence_or_failure_modes:
+          - "sampled, delayed, or best-effort logs can miss work"
+        calibration_note: "Replace with source-specific coverage and delay."
+      - name: missing_channel_suppression_score
+        value: 0.50
+        unit: score_0_to_1
+        evidence_status: project_assumption
+        source_refs: [S27, S28, S29, S30, S31, S35]
+        rationale: "Important missing channels should suppress negative certification."
+        counterevidence_or_failure_modes:
+          - "channel importance depends on candidate path and monitored scope"
+        calibration_note: "Calibrate with evidence-combination model."
+    output_fields:
+      - no_run_support_label
+      - limiting_reason
+      - capacity_upper_bound_operations
+      - strongest_missing_channel
+      - coverage_summary
+    confidence_label: conservative_bound
+    source_refs: [S01, S03, S27, S28, S29, S30, S31, S35]
