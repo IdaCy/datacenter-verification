@@ -1,0 +1,992 @@
+taxonomy_id: operator_visible_datacenter_observables
+version: "2026-05-15"
+status: observables_only_value_level_rebuild
+purpose: >
+  Independent inventory of raw or source-emitted observables for large
+  training-run verification on monitored accelerator clusters. The inventory
+  lists observable data surfaces and feature values only.
+
+methodology:
+  organization: "One OXX-numbered list of positive observable surfaces."
+  use_case: >
+    Datacenter-observable activity, capability, timing, physical-state,
+    resource-use, and data-movement values inside a monitored boundary.
+  value_shape_policy: >
+    Feature values may be scalar time series, labeled count/rate tables,
+    coherent interval lists, or coherent event lists. Each value_schema lists
+    allowed feature value fields. Join keys, source record identifiers, source
+    URLs, exact asset IDs, administrative IDs, and ticket IDs are implementation
+    metadata outside the observable feature value.
+
+temporal_policy:
+  feature_temporal_kind_required: true
+  sample: "Point or periodic measurement with `sample_time`."
+  interval: "Value or state observed over a bounded window with `start_time` and `end_time`."
+  event: "Discrete source-emitted event with `event_time`."
+  validity_interval: "Capability, inventory, shape, or configuration state valid from `valid_from` until `valid_to`."
+  reference: "Source-backed reference value without operational event time; source versioning and retrieval metadata are implementation metadata."
+
+scope_policy:
+  monitored_unit: >
+    Accelerator cluster, topology domain, rack-scale system, cloud placement
+    pool, provider-controlled capacity pool, or multi-site operator boundary
+    over a defined observation window.
+  include_if: >
+    The value is directly observed or source-emitted by a datacenter owner,
+    facility operator, cluster operator, cloud provider, storage/network
+    operator, monitoring system, or site-specific public/out-of-band source,
+    and it describes infrastructure activity, capability, timing, physical
+    state, resource use, or data movement.
+
+access_contexts:
+  public_or_out_of_band: "Site-specific public records, utility context, electrical permits, service records, and asset timing."
+  facility_operator: "Facility, rack, PDU, cooling, physical-security, BMS, DCIM, BMC, and change-management records."
+  cluster_operator: "Scheduler, orchestrator, accelerator telemetry, fabric, storage, monitoring, and maintenance records visible to a cluster operator."
+  cloud_provider_control_plane: "Provider records for compute provisioning, capacity reservation, placement, billing, audit, networking, and storage."
+  host_or_orchestrator_resource: "Host, VM, pod, container, cgroup, and infrastructure-only resource quantities."
+  storage_network_operator: "Filesystem, object-store, block, backup, replication, flow, fabric, route, and network-operation values."
+
+observables:
+  - id: O01
+    name: Accelerator inventory, capacity, partitioning, and device state
+    access_contexts: [facility_operator, cluster_operator, cloud_provider_control_plane]
+    source_refs: [nvidia_smi, nvidia_dcgm_exporter, amd_smi, google_tpu_monitoring, aws_neuron_container_insights, slurm_gres, kubernetes_device_plugins, redfish_schema_guide]
+    include: "Accelerator counts, capacity values, source-reported partitioning intervals, and device state values."
+    features:
+      - id: accelerator_count_by_family_sku
+        units: labeled_count_table
+        temporal_kind: validity_interval
+        description: "Count accelerators by family, SKU, memory class, and form factor."
+        value_schema:
+          fields:
+            - {name: valid_from, type: timestamp}
+            - {name: valid_to, type: timestamp}
+            - {name: accelerator_family, type: categorical}
+            - {name: accelerator_sku, type: categorical}
+            - {name: memory_class, type: categorical}
+            - {name: form_factor, type: categorical}
+            - {name: count, type: integer, units: accelerators}
+      - id: memory_capacity_bytes
+        units: bytes
+        temporal_kind: sample
+        description: "Source-reported accelerator device memory capacity."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: value, type: integer, units: bytes}
+      - id: memory_bandwidth_bytes_per_sec
+        units: bytes_per_second
+        temporal_kind: sample
+        description: "Source-reported accelerator memory-bandwidth capability."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: value, type: number, units: bytes_per_second}
+      - id: advertised_peak_rate_by_precision
+        units: labeled_rate_table
+        temporal_kind: validity_interval
+        description: "Source-backed peak compute rate by precision or source-reported mode."
+        value_schema:
+          fields:
+            - {name: valid_from, type: timestamp}
+            - {name: valid_to, type: timestamp}
+            - {name: precision_or_mode, type: categorical}
+            - {name: peak_rate, type: number, units: operations_per_second}
+      - id: accelerator_partitioning_intervals
+        units: interval_list
+        temporal_kind: interval
+        description: "Intervals with start/end time, partition type, slice profile, logical partition count, and sharing mode."
+        value_schema:
+          fields:
+            - {name: start_time, type: timestamp}
+            - {name: end_time, type: timestamp}
+            - {name: partition_type, type: categorical}
+            - {name: slice_profile, type: categorical}
+            - {name: logical_partition_count, type: integer}
+            - {name: sharing_mode, type: categorical}
+      - id: accelerator_power_cap_watts
+        units: watts
+        temporal_kind: sample
+        description: "Source-reported accelerator power cap or configured power limit."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: value, type: number, units: watts}
+      - id: accelerator_core_clock_hz
+        units: hertz
+        temporal_kind: sample
+        description: "Source-reported accelerator core clock."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: value, type: number, units: hertz}
+      - id: accelerator_memory_clock_hz
+        units: hertz
+        temporal_kind: sample
+        description: "Source-reported accelerator memory clock."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: value, type: number, units: hertz}
+      - id: accelerator_p_state
+        units: categorical_time_series
+        temporal_kind: sample
+        description: "Source-reported accelerator performance state."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: state, type: categorical}
+      - id: accelerator_throttle_state
+        units: categorical_time_series
+        temporal_kind: sample
+        description: "Source-reported throttle state."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: state, type: categorical}
+      - id: accelerator_performance_limit_state
+        units: categorical_time_series
+        temporal_kind: sample
+        description: "Source-reported performance-limit state."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: state, type: categorical}
+      - id: inventory_lifecycle_events
+        units: event_list
+        temporal_kind: event
+        description: "Events with event time, inventory event type, asset category, and asset count."
+        value_schema:
+          fields:
+            - {name: event_time, type: timestamp}
+            - {name: inventory_event_type, type: categorical}
+            - {name: asset_category, type: categorical}
+            - {name: asset_count, type: integer}
+      - id: accelerator_health_error_state
+        units: counters_and_state
+        temporal_kind: sample
+        description: "Source-reported device health, error, reset, link-error, throttle, and degraded-state counters."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: ecc_error_count, type: integer}
+            - {name: retired_page_count, type: integer}
+            - {name: xid_or_equivalent_error_count, type: integer}
+            - {name: reset_count, type: integer}
+            - {name: link_error_count, type: integer}
+            - {name: throttle_event_count, type: integer}
+            - {name: degraded_state, type: boolean_or_categorical}
+
+  - id: O02
+    name: Accelerator topology and interconnect capability
+    access_contexts: [cluster_operator, cloud_provider_control_plane, storage_network_operator]
+    source_refs: [nvidia_ufm_telemetry, nvidia_ufm_port_counters, aws_efa, kubernetes_device_plugins, slurm_gres, google_vpc_flow_logs]
+    include: "Local, scale-out, and cross-site fabric capability values and source-reported topology changes."
+    features:
+      - id: local_accelerator_interconnect_domain
+        units: capability_table
+        temporal_kind: validity_interval
+        description: "Local fabric type, local fabric bandwidth, and local fabric device count."
+        value_schema:
+          fields:
+            - {name: valid_from, type: timestamp}
+            - {name: valid_to, type: timestamp}
+            - {name: local_fabric_type, type: categorical}
+            - {name: local_fabric_bandwidth_gbps, type: number, units: gigabits_per_second}
+            - {name: local_fabric_device_count, type: integer}
+      - id: scaleout_fabric_domain_graph
+        units: capability_table
+        temporal_kind: validity_interval
+        description: "Scale-out fabric type, node count, link count, link bandwidth, and switch count."
+        value_schema:
+          fields:
+            - {name: valid_from, type: timestamp}
+            - {name: valid_to, type: timestamp}
+            - {name: scaleout_fabric_type, type: categorical}
+            - {name: node_count, type: integer}
+            - {name: link_count, type: integer}
+            - {name: link_bandwidth_gbps, type: number, units: gigabits_per_second}
+            - {name: switch_count, type: integer}
+      - id: cross_site_or_dci_connectivity
+        units: link_capability_state
+        temporal_kind: sample
+        description: "Cross-site link type, link capacity, and service state."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: link_type, type: categorical}
+            - {name: link_capacity_gbps, type: number, units: gigabits_per_second}
+            - {name: service_state, type: categorical}
+      - id: topology_change_events
+        units: event_list
+        temporal_kind: event
+        description: "Events with event time, topology change type, affected asset category, and affected link or port count."
+        value_schema:
+          fields:
+            - {name: event_time, type: timestamp}
+            - {name: topology_change_type, type: categorical}
+            - {name: affected_asset_category, type: categorical}
+            - {name: affected_link_or_port_count, type: integer}
+
+  - id: O03
+    name: Scheduler allocation and reservation activity
+    access_contexts: [cluster_operator, host_or_orchestrator_resource]
+    source_refs: [slurm_sacct, slurm_gres, kubernetes_device_plugins, kubernetes_events, kubernetes_audit]
+    include: "Non-semantic allocation, reservation, and preemption values."
+    features:
+      - id: allocated_accelerator_count_by_sku
+        units: labeled_count_table
+        temporal_kind: interval
+        description: "Allocated accelerator count by SKU, profile, or physical/logical partition."
+        value_schema:
+          fields:
+            - {name: start_time, type: timestamp}
+            - {name: end_time, type: timestamp}
+            - {name: accelerator_sku, type: categorical}
+            - {name: accelerator_profile, type: categorical}
+            - {name: partition_scope, type: categorical}
+            - {name: count, type: integer, units: accelerators}
+      - id: reservation_state_intervals
+        units: interval_list
+        temporal_kind: interval
+        description: "Reservation intervals with start/end time, reservation state, directly recorded capacity count, and accelerator shape or SKU."
+        value_schema:
+          fields:
+            - {name: start_time, type: timestamp}
+            - {name: end_time, type: timestamp}
+            - {name: reservation_state, type: categorical}
+            - {name: reservation_capacity_count, type: integer}
+            - {name: accelerator_shape_or_sku, type: categorical}
+      - id: allocation_preemption_events
+        units: event_list
+        temporal_kind: event
+        description: "Events with event time, preempted resource count, and resource type when directly recorded."
+        value_schema:
+          fields:
+            - {name: event_time, type: timestamp}
+            - {name: preempted_resource_count, type: integer}
+            - {name: resource_type, type: categorical}
+
+  - id: O04
+    name: Cloud compute, capacity reservation, quota, and billing activity
+    access_contexts: [cloud_provider_control_plane]
+    source_refs: [aws_cloudtrail, aws_cur, aws_ec2_capacity_blocks, aws_efa, google_cloud_audit_logs, google_cloud_billing_export, azure_monitor_vm]
+    include: "Provider-side accelerated compute shape, running interval, reservation, quota, capacity-exception, and accelerator billing values."
+    features:
+      - id: instance_type_shape_machine_type
+        units: capability_table
+        temporal_kind: validity_interval
+        description: "Compute shape, accelerator type, accelerator count, and bare-metal state."
+        value_schema:
+          fields:
+            - {name: valid_from, type: timestamp}
+            - {name: valid_to, type: timestamp}
+            - {name: instance_shape, type: categorical}
+            - {name: accelerator_type, type: categorical}
+            - {name: accelerator_count, type: integer}
+            - {name: bare_metal, type: boolean}
+      - id: compute_running_intervals
+        units: interval_list
+        temporal_kind: interval
+        description: "Intervals during which accelerator-bearing compute resources were running, with directly recorded state, accelerator count, and accelerator shape or SKU when available."
+        value_schema:
+          fields:
+            - {name: start_time, type: timestamp}
+            - {name: end_time, type: timestamp}
+            - {name: compute_resource_state, type: categorical}
+            - {name: accelerator_count, type: integer}
+            - {name: accelerator_shape_or_sku, type: categorical}
+      - id: capacity_reservation_intervals
+        units: interval_list
+        temporal_kind: interval
+        description: "Reservation intervals with start/end time, reservation state, reserved accelerator count, and accelerator shape or SKU."
+        value_schema:
+          fields:
+            - {name: start_time, type: timestamp}
+            - {name: end_time, type: timestamp}
+            - {name: reservation_state, type: categorical}
+            - {name: reserved_accelerator_count, type: integer}
+            - {name: accelerator_shape_or_sku, type: categorical}
+      - id: quota_limit_intervals
+        units: interval_list
+        temporal_kind: interval
+        description: "Quota intervals with start/end time, quota resource type, and quota limit value."
+        value_schema:
+          fields:
+            - {name: start_time, type: timestamp}
+            - {name: end_time, type: timestamp}
+            - {name: quota_resource_type, type: categorical}
+            - {name: quota_limit_value, type: number}
+            - {name: quota_limit_unit, type: categorical}
+      - id: capacity_exception_events
+        units: event_list
+        temporal_kind: event
+        description: "Events with event time, capacity exception type, requested resource count, and resource type when directly recorded."
+        value_schema:
+          fields:
+            - {name: event_time, type: timestamp}
+            - {name: capacity_exception_type, type: categorical}
+            - {name: requested_resource_count, type: integer}
+            - {name: resource_type, type: categorical}
+      - id: accelerator_compute_billing_usage_intervals
+        units: interval_list
+        temporal_kind: interval
+        description: "Accelerator-bearing compute usage intervals with usage quantity, usage unit, accelerator shape or SKU, and billing usage type."
+        value_schema:
+          fields:
+            - {name: start_time, type: timestamp}
+            - {name: end_time, type: timestamp}
+            - {name: usage_quantity, type: number}
+            - {name: usage_unit, type: categorical}
+            - {name: accelerator_shape_or_sku, type: categorical}
+            - {name: billing_usage_type, type: categorical}
+      - id: accelerator_reservation_billing_usage_intervals
+        units: interval_list
+        temporal_kind: interval
+        description: "Accelerator-capacity reservation usage intervals with usage quantity, usage unit, accelerator shape or SKU, and billing usage type."
+        value_schema:
+          fields:
+            - {name: start_time, type: timestamp}
+            - {name: end_time, type: timestamp}
+            - {name: usage_quantity, type: number}
+            - {name: usage_unit, type: categorical}
+            - {name: accelerator_shape_or_sku, type: categorical}
+            - {name: billing_usage_type, type: categorical}
+
+  - id: O05
+    name: Accelerator activity, memory, thermal, and health telemetry
+    access_contexts: [cluster_operator, cloud_provider_control_plane]
+    source_refs: [nvidia_dcgm_exporter, nvidia_smi, amd_smi, google_tpu_monitoring, aws_neuron_container_insights, google_compute_gpu_monitoring]
+    include: "Generic source-reported accelerator utilization, memory, thermal, clock, limit-state, and health telemetry."
+    features:
+      - id: accelerator_busy_or_utilization_fraction
+        units: fraction
+        temporal_kind: sample
+        description: "Reported device busy, utilization, duty cycle, or equivalent accelerator activity fraction."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: value, type: number, units: fraction}
+      - id: tensor_matrix_mxu_neuron_or_engine_active_fraction
+        units: fraction
+        temporal_kind: sample
+        description: "Generic compute-engine active fraction such as tensor, matrix, MXU, Neuron, SM, or accelerator-engine active time."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: value, type: number, units: fraction}
+            - {name: engine_scope, type: categorical}
+      - id: hbm_or_device_memory_used
+        units: bytes
+        temporal_kind: sample
+        description: "Source-reported device memory used, free, allocated, or high-water value."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: value, type: integer, units: bytes}
+            - {name: memory_value_type, type: categorical}
+      - id: memory_bandwidth_or_dram_active
+        units: bytes_per_second_or_fraction
+        temporal_kind: sample
+        description: "Source-reported memory bandwidth, DRAM/HBM active fraction, or equivalent memory activity."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: value, type: number}
+            - {name: unit, type: categorical}
+            - {name: memory_activity_type, type: categorical}
+      - id: accelerator_temperature_celsius
+        units: degrees_celsius
+        temporal_kind: sample
+        description: "Source-reported accelerator, HBM, board, or component temperature."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: value, type: number, units: degrees_celsius}
+            - {name: temperature_scope, type: categorical}
+      - id: accelerator_power_limit_active
+        units: boolean_or_categorical_time_series
+        temporal_kind: sample
+        description: "Source-reported power-limit active state."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: state, type: boolean_or_categorical}
+      - id: accelerator_thermal_limit_active
+        units: boolean_or_categorical_time_series
+        temporal_kind: sample
+        description: "Source-reported thermal-limit active state."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: state, type: boolean_or_categorical}
+
+  - id: O06
+    name: Direct achieved-operation counters
+    access_contexts: [cluster_operator, cloud_provider_control_plane]
+    source_refs: [nvidia_dcgm_exporter, google_tpu_monitoring, aws_neuron_container_insights, amd_smi]
+    include: "Achieved-operation counters only when directly emitted by hardware or provider telemetry."
+    features:
+      - id: generic_achieved_operation_rate
+        units: operations_per_second
+        temporal_kind: sample
+        description: "Directly source-emitted operation, matrix-engine, FLOP-like, or accelerator throughput rate."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: operation_rate, type: number, units: operations_per_second}
+            - {name: operation_unit, type: categorical}
+            - {name: counter_scope, type: categorical}
+
+  - id: O07
+    name: Local accelerator interconnect telemetry
+    access_contexts: [cluster_operator, cloud_provider_control_plane]
+    source_refs: [nvidia_dcgm_exporter, nvidia_smi, amd_smi]
+    include: "Local accelerator interconnect byte counters and link state telemetry."
+    features:
+      - id: local_interconnect_tx_rx_bytes
+        units: bytes
+        temporal_kind: sample
+        description: "Local accelerator fabric transmit and receive bytes."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: tx_bytes, type: integer, units: bytes}
+            - {name: rx_bytes, type: integer, units: bytes}
+      - id: local_link_error_recovery_throttle
+        units: counters_and_events
+        temporal_kind: sample
+        description: "Local link errors, recovery events, degraded link state, replay counters, and fabric throttling."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: link_error_count, type: integer}
+            - {name: recovery_event_count, type: integer}
+            - {name: degraded_link_state, type: boolean_or_categorical}
+            - {name: replay_count, type: integer}
+            - {name: throttle_state, type: boolean_or_categorical}
+
+  - id: O08
+    name: Scale-out fabric and high-performance network telemetry
+    access_contexts: [cluster_operator, cloud_provider_control_plane, storage_network_operator]
+    source_refs: [nvidia_ufm_telemetry, nvidia_ufm_port_counters, aws_efa, aws_vpc_flow_logs, google_vpc_flow_logs]
+    include: "Scale-out fabric, NIC, switch, and high-performance network counters."
+    features:
+      - id: scaleout_port_tx_rx_bytes_packets
+        units: bytes_and_packets
+        temporal_kind: sample
+        description: "Port, NIC, switch, queue, or fabric transmit/receive bytes and packets."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: tx_bytes, type: integer, units: bytes}
+            - {name: rx_bytes, type: integer, units: bytes}
+            - {name: tx_packets, type: integer, units: packets}
+            - {name: rx_packets, type: integer, units: packets}
+      - id: rdma_congestion_retry_drop_error_counters
+        units: counters_and_events
+        temporal_kind: sample
+        description: "RDMA/fabric congestion, retry, drop, retransmit, PFC/ECN, link-error, and XmitWait-like counters."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: congestion_event_count, type: integer}
+            - {name: retry_count, type: integer}
+            - {name: drop_count, type: integer}
+            - {name: retransmit_count, type: integer}
+            - {name: pfc_or_ecn_count, type: integer}
+            - {name: link_error_count, type: integer}
+            - {name: xmit_wait_time, type: number}
+      - id: fabric_port_device_sample_counters
+        units: counters_by_sample
+        temporal_kind: sample
+        description: "Per-sample fabric counters for ports, devices, racks, or monitored site scopes."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: counter_name, type: categorical}
+            - {name: counter_value, type: number}
+            - {name: counter_unit, type: categorical}
+            - {name: monitored_scope_category, type: categorical}
+
+  - id: O09
+    name: General network, egress, gateway, and data-center interconnect telemetry
+    access_contexts: [cloud_provider_control_plane, storage_network_operator]
+    source_refs: [aws_vpc_flow_logs, google_vpc_flow_logs, azure_nsg_flow_logs, aws_cloudtrail, google_cloud_audit_logs]
+    include: "Flow, byte, connection, route, gateway, and cross-site traffic values."
+    features:
+      - id: vpc_or_nsg_flow_records
+        units: flow_records
+        temporal_kind: interval
+        description: "Flow records with time window, action/state, bytes, packets, direction, interface class, and network scope."
+        value_schema:
+          fields:
+            - {name: start_time, type: timestamp}
+            - {name: end_time, type: timestamp}
+            - {name: flow_action_or_state, type: categorical}
+            - {name: bytes, type: integer, units: bytes}
+            - {name: packets, type: integer, units: packets}
+            - {name: direction, type: categorical}
+            - {name: interface_class, type: categorical}
+            - {name: network_scope, type: categorical}
+      - id: east_west_internal_flow_bytes
+        units: bytes_and_counts
+        temporal_kind: interval
+        description: "Internal network flow bytes and counts across accelerator nodes, storage systems, and service endpoints."
+        value_schema:
+          fields:
+            - {name: start_time, type: timestamp}
+            - {name: end_time, type: timestamp}
+            - {name: bytes, type: integer, units: bytes}
+            - {name: flow_count, type: integer}
+      - id: north_south_external_egress
+        units: bytes_and_counts
+        temporal_kind: interval
+        description: "External egress and ingress byte/count values for monitored infrastructure boundaries."
+        value_schema:
+          fields:
+            - {name: start_time, type: timestamp}
+            - {name: end_time, type: timestamp}
+            - {name: bytes, type: integer, units: bytes}
+            - {name: flow_count, type: integer}
+            - {name: direction, type: categorical}
+      - id: data_center_interconnect_wan_usage
+        units: bytes_and_counts
+        temporal_kind: interval
+        description: "Private-line, cloud-interconnect, cross-site, metro, WAN, or federation traffic for monitored sites."
+        value_schema:
+          fields:
+            - {name: start_time, type: timestamp}
+            - {name: end_time, type: timestamp}
+            - {name: bytes, type: integer, units: bytes}
+            - {name: flow_count, type: integer}
+            - {name: link_class, type: categorical}
+      - id: load_balancer_gateway_flow_activity
+        units: connections_and_bytes
+        temporal_kind: interval
+        description: "Provider-operated load balancer or gateway connection and byte activity at infrastructure scope."
+        value_schema:
+          fields:
+            - {name: start_time, type: timestamp}
+            - {name: end_time, type: timestamp}
+            - {name: connection_count, type: integer}
+            - {name: bytes, type: integer, units: bytes}
+      - id: network_gateway_nat_route_state
+        units: events_and_state
+        temporal_kind: event
+        description: "NAT, gateway, route, firewall, security group, and route-change state affecting flow records."
+        value_schema:
+          fields:
+            - {name: event_time, type: timestamp}
+            - {name: network_control_type, type: categorical}
+            - {name: state_event_type, type: categorical}
+            - {name: state, type: categorical}
+
+  - id: O10
+    name: Storage, filesystem, cache, and data-movement activity
+    access_contexts: [storage_network_operator, cloud_provider_control_plane, cluster_operator]
+    source_refs: [aws_s3_server_access_logs, aws_fsx_lustre_metrics, google_cloud_audit_logs, aws_cloudtrail]
+    include: "Storage timing, bytes, operation counts, cache counters, and coherent storage-operation intervals."
+    features:
+      - id: storage_read_operation_bytes
+        units: bytes_and_operations
+        temporal_kind: interval
+        description: "Read operation counts and read byte counts by time window and storage scope."
+        value_schema:
+          fields:
+            - {name: start_time, type: timestamp}
+            - {name: end_time, type: timestamp}
+            - {name: read_operation_count, type: integer}
+            - {name: read_bytes, type: integer, units: bytes}
+      - id: storage_write_operation_bytes
+        units: bytes_and_operations
+        temporal_kind: interval
+        description: "Write operation counts and write byte counts by time window and storage scope."
+        value_schema:
+          fields:
+            - {name: start_time, type: timestamp}
+            - {name: end_time, type: timestamp}
+            - {name: write_operation_count, type: integer}
+            - {name: write_bytes, type: integer, units: bytes}
+      - id: filesystem_throughput_metadata_ops
+        units: bytes_per_second_and_operations
+        temporal_kind: sample
+        description: "Filesystem read/write throughput, metadata operation counts, queueing, and client I/O values."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: read_bytes_per_sec, type: number, units: bytes_per_second}
+            - {name: write_bytes_per_sec, type: number, units: bytes_per_second}
+            - {name: metadata_operation_count, type: integer}
+            - {name: queue_depth, type: number}
+            - {name: client_io_operation_count, type: integer}
+      - id: cache_hit_miss_counters
+        units: counts
+        temporal_kind: interval
+        description: "Object cache, filesystem cache, or local SSD staging hit/miss and access counters."
+        value_schema:
+          fields:
+            - {name: start_time, type: timestamp}
+            - {name: end_time, type: timestamp}
+            - {name: cache_hit_count, type: integer}
+            - {name: cache_miss_count, type: integer}
+            - {name: access_count, type: integer}
+      - id: object_storage_operation_counts
+        units: bytes_and_counts
+        temporal_kind: interval
+        description: "Object-store operation counts, distinct object counts when directly available, and transferred bytes by time window and operation type."
+        value_schema:
+          fields:
+            - {name: start_time, type: timestamp}
+            - {name: end_time, type: timestamp}
+            - {name: operation_type, type: categorical}
+            - {name: operation_count, type: integer}
+            - {name: object_count, type: integer}
+            - {name: bytes, type: integer, units: bytes}
+            - {name: object_count_type, type: categorical}
+      - id: storage_operation_intervals
+        units: interval_list
+        temporal_kind: interval
+        description: "Storage backup, restore, migration, rebuild, replication, or disaster-recovery intervals with operation type and bytes moved when directly recorded."
+        value_schema:
+          fields:
+            - {name: start_time, type: timestamp}
+            - {name: end_time, type: timestamp}
+            - {name: operation_type, type: categorical}
+            - {name: bytes_moved, type: integer, units: bytes}
+      - id: object_or_file_copy_movement_records
+        units: bytes_and_routes
+        temporal_kind: interval
+        description: "Object or file copy/movement values measured by bytes, route class, and timing."
+        value_schema:
+          fields:
+            - {name: start_time, type: timestamp}
+            - {name: end_time, type: timestamp}
+            - {name: operation_type, type: categorical}
+            - {name: bytes_moved, type: integer, units: bytes}
+            - {name: route_class, type: categorical}
+
+  - id: O11
+    name: Rack, server, PDU, facility power, and energy telemetry
+    access_contexts: [facility_operator, cluster_operator, cloud_provider_control_plane]
+    source_refs: [redfish_standard, redfish_schema_guide, nvidia_dcgm_exporter, nvidia_smi]
+    include: "Power and energy readings from devices, servers, racks, rooms, and facility power infrastructure."
+    features:
+      - id: accelerator_device_power_energy
+        units: watts_and_joules
+        temporal_kind: sample
+        description: "Device-reported power and energy as a paired physical activity time series."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: power_watts, type: number, units: watts}
+            - {name: energy_joules, type: number, units: joules}
+      - id: server_system_input_power
+        units: watts
+        temporal_kind: sample
+        description: "Server, tray, rack-scale system, or BMC input power."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: power_watts, type: number, units: watts}
+      - id: rack_pdu_it_power
+        units: watts_and_joules
+        temporal_kind: sample
+        description: "Rack PDU, busway, breaker, or rack-level IT power and energy."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: power_watts, type: number, units: watts}
+            - {name: energy_joules, type: number, units: joules}
+      - id: facility_or_room_it_power_rollup
+        units: watts_and_joules
+        temporal_kind: sample
+        description: "UPS, switchgear, room, pod, row, or facility IT power rollup for the monitored boundary."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: power_watts, type: number, units: watts}
+            - {name: energy_joules, type: number, units: joules}
+            - {name: facility_scope_category, type: categorical}
+      - id: power_cap_violation_throttle_state
+        units: events_and_state
+        temporal_kind: event
+        description: "Source-reported power cap, throttle, limit-violation, and performance-limit events."
+        value_schema:
+          fields:
+            - {name: event_time, type: timestamp}
+            - {name: power_cap_watts, type: number, units: watts}
+            - {name: throttle_state, type: boolean_or_categorical}
+            - {name: limit_violation_state, type: boolean_or_categorical}
+            - {name: performance_limit_state, type: boolean_or_categorical}
+
+  - id: O12
+    name: Cooling, airflow, thermal, and environmental telemetry
+    access_contexts: [facility_operator, cluster_operator]
+    source_refs: [redfish_standard, redfish_schema_guide, nvidia_dcgm_exporter, nvidia_smi]
+    include: "Cooling, airflow, environmental, and control-state values for monitored devices and facility scopes."
+    features:
+      - id: inlet_outlet_air_or_coolant_temperature
+        units: degrees_celsius
+        temporal_kind: sample
+        description: "Rack/server inlet/outlet, liquid inlet/outlet, rear-door, CDU, and heat-exchanger temperatures."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: inlet_temperature_celsius, type: number, units: degrees_celsius}
+            - {name: outlet_temperature_celsius, type: number, units: degrees_celsius}
+            - {name: temperature_scope, type: categorical}
+      - id: coolant_flow_rate
+        units: flow_rate
+        temporal_kind: sample
+        description: "Source-reported coolant flow rate."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: value, type: number}
+            - {name: unit, type: categorical}
+      - id: coolant_pressure
+        units: pressure
+        temporal_kind: sample
+        description: "Source-reported coolant pressure."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: value, type: number}
+            - {name: unit, type: categorical}
+      - id: pump_speed_or_state
+        units: rpm_percent_or_categorical
+        temporal_kind: sample
+        description: "Source-reported pump speed or pump state."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: pump_speed, type: number}
+            - {name: pump_speed_unit, type: categorical}
+            - {name: pump_state, type: categorical}
+      - id: valve_position_or_state
+        units: percent_or_categorical
+        temporal_kind: sample
+        description: "Source-reported valve position or valve state."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: valve_position_percent, type: number, units: percent}
+            - {name: valve_state, type: categorical}
+      - id: cooling_alarm_state
+        units: boolean_or_categorical_time_series
+        temporal_kind: sample
+        description: "Source-reported cooling alarm state."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: state, type: boolean_or_categorical}
+      - id: fan_speed_rpm_or_percent
+        units: rpm_or_percent
+        temporal_kind: sample
+        description: "Source-reported fan speed."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: value, type: number}
+            - {name: unit, type: categorical}
+      - id: airflow_rate
+        units: airflow_rate
+        temporal_kind: sample
+        description: "Source-reported airflow rate."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: value, type: number}
+            - {name: unit, type: categorical}
+      - id: thermal_control_mode
+        units: categorical_time_series
+        temporal_kind: sample
+        description: "Source-reported thermal or cooling control mode."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: state, type: categorical}
+      - id: source_reported_airflow_state
+        units: categorical_time_series
+        temporal_kind: sample
+        description: "Source-reported airflow state."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: state, type: categorical}
+      - id: outdoor_air_temperature_celsius
+        units: degrees_celsius
+        temporal_kind: sample
+        description: "Source-reported outdoor air temperature for the site or facility scope."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: value, type: number, units: degrees_celsius}
+      - id: outdoor_humidity_percent
+        units: percent
+        temporal_kind: sample
+        description: "Source-reported outdoor humidity for the site or facility scope."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: value, type: number, units: percent}
+      - id: hvac_control_mode
+        units: categorical_time_series
+        temporal_kind: sample
+        description: "Source-reported HVAC control mode."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: state, type: categorical}
+      - id: economizer_state
+        units: categorical_time_series
+        temporal_kind: sample
+        description: "Source-reported economizer state."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: state, type: categorical}
+      - id: facility_temperature_setpoint_celsius
+        units: degrees_celsius
+        temporal_kind: sample
+        description: "Source-reported facility temperature setpoint, when available."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: value, type: number, units: degrees_celsius}
+
+  - id: O13
+    name: Host, VM, container, and cgroup resource activity
+    access_contexts: [host_or_orchestrator_resource, cluster_operator, cloud_provider_control_plane]
+    source_refs: [kubernetes_device_plugins, kubernetes_events, kubernetes_audit, aws_neuron_container_insights, azure_monitor_vm]
+    include: "Non-semantic resource request, limit, usage, and resource-container lifecycle values."
+    features:
+      - id: container_resource_request_quantity
+        units: resource_quantity
+        temporal_kind: sample
+        description: "Requested resource quantity by resource type, unit, and sample/window time."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: resource_type, type: categorical}
+            - {name: quantity, type: number}
+            - {name: unit, type: categorical}
+      - id: container_resource_limit_quantity
+        units: resource_quantity
+        temporal_kind: sample
+        description: "Resource limit quantity by resource type, unit, and sample/window time."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: resource_type, type: categorical}
+            - {name: quantity, type: number}
+            - {name: unit, type: categorical}
+      - id: container_resource_usage_quantity
+        units: resource_quantity
+        temporal_kind: sample
+        description: "Observed resource usage quantity by resource type, unit, and sample/window time."
+        value_schema:
+          fields:
+            - {name: sample_time, type: timestamp}
+            - {name: resource_type, type: categorical}
+            - {name: quantity, type: number}
+            - {name: unit, type: categorical}
+      - id: resource_container_lifecycle_events
+        units: event_list
+        temporal_kind: event
+        description: "Events with event time, lifecycle event type, and resource-container count."
+        value_schema:
+          fields:
+            - {name: event_time, type: timestamp}
+            - {name: lifecycle_event_type, type: categorical}
+            - {name: resource_container_count, type: integer}
+
+  - id: O14
+    name: Operator maintenance, change, and physical-access intervals
+    access_contexts: [cluster_operator, facility_operator, storage_network_operator]
+    source_refs: [slurm_sacct, redfish_standard, redfish_schema_guide, aws_fsx_lustre_metrics]
+    include: "Coarse operator/facility event values that can affect capacity, topology, telemetry, storage, power, cooling, or physical state."
+    features:
+      - id: maintenance_operation_intervals
+        units: interval_list
+        temporal_kind: interval
+        description: "Maintenance intervals with start/end time, maintenance type, status, affected asset category/count, and old/new version values only when directly recorded."
+        value_schema:
+          fields:
+            - {name: start_time, type: timestamp}
+            - {name: end_time, type: timestamp}
+            - {name: maintenance_type, type: categorical}
+            - {name: maintenance_status, type: categorical}
+            - {name: affected_asset_category, type: categorical}
+            - {name: affected_asset_count, type: integer}
+            - {name: old_version, type: categorical}
+            - {name: new_version, type: categorical}
+      - id: physical_access_events
+        units: event_list
+        temporal_kind: event
+        description: "Events with event time, access scope category, access event type, and access count or state."
+        value_schema:
+          fields:
+            - {name: event_time, type: timestamp}
+            - {name: access_scope_category, type: categorical}
+            - {name: access_event_type, type: categorical}
+            - {name: access_count_or_state, type: integer_or_categorical}
+
+  - id: O15
+    name: Site-specific utility, electrical, and asset timing records
+    access_contexts: [public_or_out_of_band, facility_operator]
+    source_refs: [epoch_frontier_datacenters, redfish_schema_guide]
+    include: "Site-specific external or facility records with concrete utility, electrical, and asset-timing values for an already identified monitored site."
+    features:
+      - id: utility_interconnection_status_intervals
+        units: interval_list
+        temporal_kind: interval
+        description: "Interconnection intervals with start/end time, status, requested load, contracted load, voltage, and service class when directly recorded."
+        value_schema:
+          fields:
+            - {name: start_time, type: timestamp}
+            - {name: end_time, type: timestamp}
+            - {name: interconnection_status, type: categorical}
+            - {name: requested_load_mw, type: number, units: megawatts}
+            - {name: contracted_load_mw, type: number, units: megawatts}
+            - {name: voltage_kv, type: number, units: kilovolts}
+            - {name: service_class, type: categorical}
+      - id: electrical_service_status_intervals
+        units: interval_list
+        temporal_kind: interval
+        description: "Electrical service or energization intervals with start/end time, service status, capacity, voltage, and service class when directly recorded."
+        value_schema:
+          fields:
+            - {name: start_time, type: timestamp}
+            - {name: end_time, type: timestamp}
+            - {name: service_status, type: categorical}
+            - {name: service_capacity_mw, type: number, units: megawatts}
+            - {name: service_capacity_mva, type: number, units: megavolt_amperes}
+            - {name: service_voltage_kv, type: number, units: kilovolts}
+            - {name: service_class, type: categorical}
+      - id: electrical_permit_status_intervals
+        units: interval_list
+        temporal_kind: interval
+        description: "Electrical permit intervals with start/end time, permit status, equipment type, and permitted capacity/voltage values when directly recorded."
+        value_schema:
+          fields:
+            - {name: start_time, type: timestamp}
+            - {name: end_time, type: timestamp}
+            - {name: permit_status, type: categorical}
+            - {name: electrical_equipment_type, type: categorical}
+            - {name: permitted_transformer_mva, type: number, units: megavolt_amperes}
+            - {name: permitted_switchgear_mva, type: number, units: megavolt_amperes}
+            - {name: permitted_service_mw, type: number, units: megawatts}
+            - {name: permitted_service_mva, type: number, units: megavolt_amperes}
+            - {name: permitted_voltage_kv, type: number, units: kilovolts}
+      - id: asset_receiving_installation_events
+        units: event_list
+        temporal_kind: event
+        description: "Receipt or installation events with event time, event type, asset category, and asset quantity."
+        value_schema:
+          fields:
+            - {name: event_time, type: timestamp}
+            - {name: event_type, type: categorical}
+            - {name: asset_category, type: categorical}
+            - {name: asset_quantity, type: integer}

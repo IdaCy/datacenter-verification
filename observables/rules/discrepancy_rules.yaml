@@ -1,0 +1,1209 @@
+schema_version: "0.1"
+created: "2026-05-16"
+source_inventory: observables/observables.yaml
+status: study_algorithm_rule_spec
+
+severity_scale: [info, low, medium, high, critical]
+
+discrepancy_rules:
+  - id: high_power_low_gpu_activity
+    purpose: discrepancy_integrity_check
+    required_features:
+      - rack_pdu_it_power
+      - accelerator_busy_or_utilization_fraction
+    optional_features:
+      - accelerator_device_power_energy
+      - server_system_input_power
+      - facility_or_room_it_power_rollup
+      - tensor_matrix_mxu_neuron_or_engine_active_fraction
+      - generic_achieved_operation_rate
+      - maintenance_operation_intervals
+      - cooling_alarm_state
+    derived_signals:
+      - sustained_accelerator_activity_window
+      - clock_aligned_overlap_window
+    compared_time_windows: "Lag-adjusted rack/server/device power window versus accelerator activity samples for the same mapped rack or device set."
+    triggering_condition: "Baseline-subtracted power is high while accelerator activity channels are low or missing in a covered window."
+    trigger:
+      type: discrepancy_threshold_logic
+      evaluation_window: lag_adjusted_power_activity_window
+      source_refs: [S07, S08, S09, S40, S41]
+      conditions:
+        all:
+          - metric: baseline_subtracted_power_fraction_of_scope_capacity
+            op: ">="
+            value_ref: min_power_load_fraction
+          - metric: clock_aligned_overlap_window.duration_seconds
+            op: ">="
+            value_ref: min_overlap_duration_seconds
+        any:
+          - metric: sustained_accelerator_activity_window.activity_score
+            op: "<="
+            value_ref: max_low_activity_score
+          - metric: telemetry_coverage_fraction.accelerator_activity
+            op: "<"
+            value_ref: min_activity_coverage_fraction
+        none:
+          - metric: benign_explanation_score
+            op: ">="
+            value_ref: benign_explanation_suppression_score
+      missing_data_behavior: "If accelerator activity coverage is below the threshold, emit `activity_missing` severity mapping rather than treating low samples as true low activity."
+      severity_mapping:
+        info: "Power load passes but mixed-tenant or maintenance explanation covers >= 0.8 of the window."
+        medium: "Power load passes and activity is low or missing for >= 10 minutes."
+        high: "Power load >= 0.50 of scope capacity, activity_score <= 0.10, and activity coverage >= 0.90 with no benign explanation."
+      benign_suppression_conditions:
+        - id: maintenance_or_cooling_fault
+          metric: maintenance_or_cooling_explanation_overlap_fraction
+          op: ">="
+          value_ref: benign_explanation_overlap_fraction
+        - id: mixed_tenant_rack_load
+          metric: scope_mapping_confidence
+          op: "<"
+          value_ref: min_scope_mapping_confidence
+      calibration_defaults:
+        - name: min_power_load_fraction
+          value: 0.25
+          unit: fraction_of_scope_power_capacity
+          evidence_status: calibration_default
+          rationale: "Power must be materially above baseline before challenging accelerator activity telemetry."
+          counterevidence_or_failure_modes: ["CPU, storage, network, or mixed-tenant loads can raise power"]
+          calibration_note: "Replace with rack/server/device baseline and workload-specific power distributions."
+        - name: min_overlap_duration_seconds
+          value: 600
+          unit: seconds
+          evidence_status: calibration_default
+          rationale: "Avoids short transients and telemetry skew."
+          counterevidence_or_failure_modes: ["brief high-power tests can still matter"]
+          calibration_note: "Tune by power and accelerator scrape periods."
+        - name: max_low_activity_score
+          value: 0.20
+          unit: score_0_to_1
+          evidence_status: calibration_default
+          rationale: "Defines low normalized accelerator activity for discrepancy review."
+          counterevidence_or_failure_modes: ["activity counters can under-report or miss non-GPU load"]
+          calibration_note: "Calibrate by hardware and confirmed idle/active windows."
+        - name: min_activity_coverage_fraction
+          value: 0.80
+          unit: fraction
+          evidence_status: source_informed
+          rationale: "Low activity is meaningful only with adequate activity coverage."
+          counterevidence_or_failure_modes: ["collector gaps can mimic low activity"]
+          calibration_note: "Replace with telemetry source coverage."
+        - name: benign_explanation_suppression_score
+          value: 0.75
+          unit: score_0_to_1
+          evidence_status: calibration_default
+          rationale: "Strong benign explanations should lower severity."
+          counterevidence_or_failure_modes: ["maintenance can overlap unexplained activity"]
+          calibration_note: "Calibrate explanation scores from maintenance and cooling records."
+        - name: benign_explanation_overlap_fraction
+          value: 0.80
+          unit: fraction
+          evidence_status: calibration_default
+          rationale: "Explanation should cover most of the suspicious window."
+          counterevidence_or_failure_modes: ["coarse intervals can over-explain"]
+          calibration_note: "Tune by operation-record precision."
+        - name: min_scope_mapping_confidence
+          value: 0.70
+          unit: score_0_to_1
+          evidence_status: calibration_default
+          rationale: "Poor scope mapping should lower severity because power may belong to other tenants."
+          counterevidence_or_failure_modes: ["unmapped real accelerator load remains possible"]
+          calibration_note: "Replace with DCIM-to-cluster mapping quality."
+    benign_explanations_to_check:
+      - cpu_or_storage_load
+      - mixed_tenant_rack_load
+      - burn_in_or_benchmark
+      - maintenance_or_cooling_fault
+      - device_telemetry_gap
+    output:
+      severity: medium
+      fields:
+        - affected_scope
+        - power_delta_watts
+        - activity_summary
+        - coverage_summary
+        - explanations_checked
+
+  - id: high_gpu_activity_no_allocation
+    purpose: discrepancy_attribution_check
+    required_features:
+      - tensor_matrix_mxu_neuron_or_engine_active_fraction
+      - allocated_accelerator_count_by_sku
+    optional_features:
+      - generic_achieved_operation_rate
+      - accelerator_busy_or_utilization_fraction
+      - compute_running_intervals
+      - container_resource_usage_quantity
+      - accelerator_compute_billing_usage_intervals
+      - maintenance_operation_intervals
+      - resource_container_lifecycle_events
+    derived_signals:
+      - sustained_accelerator_activity_window
+      - clock_aligned_overlap_window
+    compared_time_windows: "Accelerator activity windows versus scheduler, cloud running, container, and billing windows for the same scope."
+    triggering_condition: "Sustained accelerator activity has no overlapping allocation, running, container, or billing record."
+    trigger:
+      type: discrepancy_threshold_logic
+      evaluation_window: activity_allocation_overlap_window
+      source_refs: [S18, S19, S20, S21, S22, S23, S26, S35, S36, S37, S38, S39]
+      conditions:
+        all:
+          - metric: sustained_accelerator_activity_window.activity_score
+            op: ">="
+            value_ref: min_activity_score
+          - metric: sustained_accelerator_activity_window.duration_seconds
+            op: ">="
+            value_ref: min_activity_duration_seconds
+          - metric: allocation_or_running_overlap_fraction
+            op: "<="
+            value_ref: max_allocation_overlap_fraction
+          - metric: telemetry_coverage_fraction.allocation_channels
+            op: ">="
+            value_ref: min_allocation_coverage_fraction
+        none:
+          - metric: benign_unmanaged_or_maintenance_overlap_fraction
+            op: ">="
+            value_ref: benign_explanation_overlap_fraction
+      missing_data_behavior: "If allocation/running/billing coverage is unknown, severity is at most medium and output must identify missing attribution channels."
+      severity_mapping:
+        medium: "High activity with sparse or unknown allocation coverage."
+        high: "High sustained activity with allocation/running/container/billing overlap <= 0.05 and coverage >= 0.80."
+        critical: "High sustained activity for >= 3600 seconds with no attribution in any covered channel and no maintenance/system-job explanation."
+      benign_suppression_conditions:
+        - id: emergency_or_system_job
+          metric: maintenance_or_system_job_overlap_fraction
+          op: ">="
+          value_ref: benign_explanation_overlap_fraction
+        - id: accounting_delay
+          metric: scheduler_accounting_delay_seconds
+          op: "<="
+          value_ref: max_accounting_delay_seconds
+      calibration_defaults:
+        - name: min_activity_score
+          value: 0.70
+          unit: score_0_to_1
+          evidence_status: calibration_default
+          rationale: "Attribution discrepancy should require clear accelerator activity."
+          counterevidence_or_failure_modes: ["incomplete activity normalization can inflate score"]
+          calibration_note: "Calibrate by activity counter and hardware family."
+        - name: min_activity_duration_seconds
+          value: 600
+          unit: seconds
+          evidence_status: calibration_default
+          rationale: "Filters short accounting races and lifecycle transitions."
+          counterevidence_or_failure_modes: ["short unauthorized jobs can still matter"]
+          calibration_note: "Tune by scheduler accounting latency."
+        - name: max_allocation_overlap_fraction
+          value: 0.05
+          unit: fraction
+          evidence_status: calibration_default
+          rationale: "Allows minor clock skew while flagging effectively unmapped activity."
+          counterevidence_or_failure_modes: ["scope mapping errors can lower apparent overlap"]
+          calibration_note: "Replace with clock-alignment and mapping error bounds."
+        - name: min_allocation_coverage_fraction
+          value: 0.80
+          unit: fraction
+          evidence_status: source_informed
+          rationale: "Scheduler, cloud, or billing records must be covered before concluding no allocation."
+          counterevidence_or_failure_modes: ["accounting feeds can be delayed or incomplete"]
+          calibration_note: "Calibrate by control-plane record delivery delay."
+        - name: benign_explanation_overlap_fraction
+          value: 0.80
+          unit: fraction
+          evidence_status: calibration_default
+          rationale: "A benign explanation should cover most activity before reducing severity."
+          counterevidence_or_failure_modes: ["broad maintenance windows can over-explain"]
+          calibration_note: "Tune by maintenance record precision."
+        - name: max_accounting_delay_seconds
+          value: 3600
+          unit: seconds
+          evidence_status: calibration_default
+          rationale: "Allows common aggregation or export delay before escalating."
+          counterevidence_or_failure_modes: ["some systems delay records longer; unauthorized jobs may finish faster"]
+          calibration_note: "Replace with measured scheduler/cloud accounting latency."
+    benign_explanations_to_check:
+      - scheduler_accounting_delay
+      - unmanaged_or_system_job
+      - provider_hidden_mapping
+      - emergency_maintenance
+      - collector_scope_mismatch
+    output:
+      severity: high
+      fields:
+        - activity_window
+        - missing_allocation_channels
+        - mapped_devices
+        - alternative_attribution
+        - review_priority
+
+  - id: high_fabric_activity_no_job_mapping
+    purpose: discrepancy_attribution_check
+    required_features:
+      - scaleout_port_tx_rx_bytes_packets
+      - allocated_accelerator_count_by_sku
+    optional_features:
+      - compute_running_intervals
+      - container_resource_usage_quantity
+      - local_interconnect_tx_rx_bytes
+      - fabric_port_device_sample_counters
+      - rdma_congestion_retry_drop_error_counters
+      - topology_change_events
+      - vpc_or_nsg_flow_records
+      - east_west_internal_flow_bytes
+    derived_signals:
+      - stable_participant_set
+      - collective_cadence_score
+      - fabric_compute_time_alignment
+    compared_time_windows: "Scale-out fabric activity versus allocation/container/topology mapping for the same ports, nodes, or monitored domain."
+    triggering_condition: "High synchronized fabric traffic or collective cadence has no stable job, account, container, or topology-domain mapping."
+    trigger:
+      type: discrepancy_threshold_logic
+      evaluation_window: candidate_fabric_activity_window
+      source_refs: [S11, S18, S20, S25, S28, S29, S42, S43]
+      conditions:
+        all:
+          - metric: collective_cadence_score.cadence_score
+            op: ">="
+            value_ref: min_cadence_score
+          - metric: collective_cadence_score.normalized_fabric_burst_score
+            op: ">="
+            value_ref: min_normalized_fabric_burst_score
+          - metric: stable_participant_set.participant_count
+            op: ">="
+            value_ref: min_participant_count
+          - metric: job_or_container_mapping_coverage_fraction
+            op: "<="
+            value_ref: max_mapping_coverage_fraction
+        none:
+          - metric: storage_or_network_test_explanation_score
+            op: ">="
+            value_ref: explanation_suppression_score
+      missing_data_behavior: "Missing port-to-job mapping is the discrepancy; emit mapping_gap and include which mapping channels were unavailable."
+      severity_mapping:
+        medium: "High fabric activity has partial mapping gaps or possible storage/network-test explanation."
+        high: "Cadence and normalized fabric thresholds pass with mapping coverage <= 0.20 and no explanation."
+        critical: "Large participant count >= 64, high cadence >= 0.85, mapping coverage <= 0.05, and no allocation/container/topology mapping."
+      benign_suppression_conditions:
+        - id: storage_replication_backup
+          metric: storage_explanation_overlap_fraction
+          op: ">="
+          value_ref: explanation_overlap_fraction
+        - id: route_or_topology_change
+          metric: route_or_topology_change_overlap_fraction
+          op: ">="
+          value_ref: explanation_overlap_fraction
+      calibration_defaults:
+        - name: min_cadence_score
+          value: 0.65
+          unit: score_0_to_1
+          evidence_status: calibration_default
+          rationale: "Requires synchronized or repeated fabric structure before treating mapping absence as important."
+          counterevidence_or_failure_modes: ["coarse fabric counters can over-score periodicity"]
+          calibration_note: "Calibrate with local fabric telemetry and known jobs."
+        - name: min_normalized_fabric_burst_score
+          value: 0.55
+          unit: score_0_to_1
+          evidence_status: calibration_default
+          rationale: "Uses normalized fabric score instead of raw bytes."
+          counterevidence_or_failure_modes: ["storage and benchmarks can pass"]
+          calibration_note: "Replace with local fabric score distributions."
+        - name: min_participant_count
+          value: 8
+          unit: participants
+          evidence_status: calibration_default
+          rationale: "Mapping gaps matter more for multi-participant traffic."
+          counterevidence_or_failure_modes: ["small unmapped activity can still indicate evasion"]
+          calibration_note: "Tune by topology and job mapping granularity."
+        - name: max_mapping_coverage_fraction
+          value: 0.20
+          unit: fraction
+          evidence_status: calibration_default
+          rationale: "At most sparse mapping exists for the suspicious fabric window."
+          counterevidence_or_failure_modes: ["mapping source outages can create false positives"]
+          calibration_note: "Calibrate port-to-job and container mapping reliability."
+        - name: explanation_suppression_score
+          value: 0.75
+          unit: score_0_to_1
+          evidence_status: calibration_default
+          rationale: "Strong alternative explanation should lower severity."
+          counterevidence_or_failure_modes: ["explanations can overlap real collective traffic"]
+          calibration_note: "Tune with storage, benchmark, and HPC labels."
+        - name: explanation_overlap_fraction
+          value: 0.80
+          unit: fraction
+          evidence_status: calibration_default
+          rationale: "Alternative explanation should cover most of the fabric window."
+          counterevidence_or_failure_modes: ["coarse intervals can over-explain"]
+          calibration_note: "Use source-specific operation intervals."
+    benign_explanations_to_check:
+      - storage_replication_or_backup
+      - network_test_or_benchmark
+      - hpc_mpi_workload
+      - routing_or_topology_change
+      - port_to_job_mapping_gap
+    output:
+      severity: high
+      fields:
+        - fabric_window
+        - participant_set
+        - missing_mapping_type
+        - cadence_score
+        - explanations_checked
+
+  - id: checkpoint_writes_no_accelerator_activity
+    purpose: discrepancy_false_positive_check
+    required_features:
+      - storage_write_operation_bytes
+      - tensor_matrix_mxu_neuron_or_engine_active_fraction
+    optional_features:
+      - object_storage_operation_counts
+      - filesystem_throughput_metadata_ops
+      - generic_achieved_operation_rate
+      - accelerator_busy_or_utilization_fraction
+      - storage_operation_intervals
+      - object_or_file_copy_movement_records
+      - accelerator_device_power_energy
+    derived_signals:
+      - checkpoint_periodicity_score
+      - sustained_accelerator_activity_window
+    compared_time_windows: "Checkpoint-like write bursts versus accelerator activity in the preceding, overlapping, and immediately following windows."
+    triggering_condition: "Periodic large writes resemble checkpoints but no accelerator activity is present or covered."
+    trigger:
+      type: discrepancy_threshold_logic
+      evaluation_window: checkpoint_activity_adjacency_window
+      source_refs: [S31, S32, S33, S45, S46, S47]
+      conditions:
+        all:
+          - metric: checkpoint_periodicity_score.write_burst_count
+            op: ">="
+            value_ref: min_write_burst_count
+          - metric: checkpoint_periodicity_score.periodicity_score
+            op: ">="
+            value_ref: min_periodicity_score
+          - metric: checkpoint_size_consistency.size_consistency_score
+            op: ">="
+            value_ref: min_size_consistency_score
+        any:
+          - metric: sustained_accelerator_activity_window.activity_score
+            op: "<="
+            value_ref: max_activity_score
+          - metric: telemetry_coverage_fraction.accelerator_activity
+            op: "<"
+            value_ref: min_activity_coverage_fraction
+        none:
+          - metric: storage_operation_explanation_score
+            op: ">="
+            value_ref: storage_explanation_suppression_score
+      missing_data_behavior: "If accelerator activity telemetry is missing, emit `activity_missing` and route to telemetry-gap review rather than concluding no training activity."
+      severity_mapping:
+        info: "Writes explained by explicit backup/replication/migration interval."
+        medium: "Checkpoint-like writes with low or missing accelerator activity."
+        high: "Repeated checkpoint-like writes with adequate activity coverage and activity_score <= 0.10, no storage explanation."
+      benign_suppression_conditions:
+        - id: storage_operation_explains_writes
+          metric: storage_operation_overlap_fraction
+          op: ">="
+          value_ref: storage_explanation_overlap_fraction
+        - id: activity_telemetry_gap
+          metric: telemetry_coverage_fraction.accelerator_activity
+          op: "<"
+          value_ref: min_activity_coverage_fraction
+      calibration_defaults:
+        - name: min_write_burst_count
+          value: 2
+          unit: bursts
+          evidence_status: calibration_default
+          rationale: "At least two bursts are needed to resemble checkpoint cadence."
+          counterevidence_or_failure_modes: ["single final checkpoints can be real training"]
+          calibration_note: "Replace with local checkpoint policy."
+        - name: min_periodicity_score
+          value: 0.60
+          unit: score_0_to_1
+          evidence_status: mechanism_inferred
+          rationale: "Repeated write cadence indicates checkpoint-like behavior but is not unique to training."
+          counterevidence_or_failure_modes: ["backup schedules can be periodic"]
+          calibration_note: "Calibrate with checkpoint and backup traces."
+        - name: min_size_consistency_score
+          value: 0.55
+          unit: score_0_to_1
+          evidence_status: calibration_default
+          rationale: "Consistent repeated writes strengthen checkpoint-like classification."
+          counterevidence_or_failure_modes: ["snapshots and backups can also be consistent"]
+          calibration_note: "Tune by storage system and checkpoint implementation."
+        - name: max_activity_score
+          value: 0.20
+          unit: score_0_to_1
+          evidence_status: calibration_default
+          rationale: "Defines low accelerator activity near write bursts."
+          counterevidence_or_failure_modes: ["checkpoint writes can happen after activity pauses"]
+          calibration_note: "Tune adjacency windows and activity scoring."
+        - name: min_activity_coverage_fraction
+          value: 0.80
+          unit: fraction
+          evidence_status: source_informed
+          rationale: "No-activity discrepancy requires covered activity telemetry."
+          counterevidence_or_failure_modes: ["activity telemetry gaps can cause false positives"]
+          calibration_note: "Replace with accelerator telemetry coverage."
+        - name: storage_explanation_suppression_score
+          value: 0.75
+          unit: score_0_to_1
+          evidence_status: calibration_default
+          rationale: "Strong storage explanation lowers severity."
+          counterevidence_or_failure_modes: ["backup can overlap real checkpointing"]
+          calibration_note: "Calibrate with storage operation labels."
+        - name: storage_explanation_overlap_fraction
+          value: 0.80
+          unit: fraction
+          evidence_status: calibration_default
+          rationale: "Storage explanation must overlap most suspicious writes."
+          counterevidence_or_failure_modes: ["coarse intervals can over-explain"]
+          calibration_note: "Tune with storage-operation interval accuracy."
+    benign_explanations_to_check:
+      - backup_or_snapshot
+      - synthetic_data_generation_output
+      - data_export_or_etl
+      - storage_migration
+      - accelerator_telemetry_gap
+    output:
+      severity: medium
+      fields:
+        - write_window
+        - write_burst_count
+        - activity_overlap_fraction
+        - likely_explanation
+        - remaining_training_support
+
+  - id: activity_before_installation_or_electrical_service
+    purpose: physical_timeline_check
+    required_features:
+      - asset_receiving_installation_events
+      - electrical_service_status_intervals
+    optional_features:
+      - utility_interconnection_status_intervals
+      - electrical_permit_status_intervals
+      - inventory_lifecycle_events
+      - accelerator_count_by_family_sku
+      - compute_running_intervals
+      - accelerator_busy_or_utilization_fraction
+      - rack_pdu_it_power
+      - facility_or_room_it_power_rollup
+    derived_signals:
+      - capacity_upper_bound_flop
+      - available_accelerator_fraction
+    compared_time_windows: "Activity or capacity claims versus receipt, installation, commissioning, utility, and energized-service intervals."
+    triggering_condition: "Observed or claimed activity occurs before documented installation, commissioning, or sufficient electrical service for the monitored site."
+    trigger:
+      type: physical_timeline_threshold_logic
+      evaluation_window: claimed_or_observed_activity_window
+      source_refs: [S40, S41, S44]
+      conditions:
+        all:
+          - metric: claimed_or_observed_activity_score
+            op: ">="
+            value_ref: min_activity_or_claim_score
+          - metric: earliest_plausible_capacity_time_delta_seconds
+            op: "<"
+            value_ref: negative_grace_period_seconds
+        any:
+          - metric: capacity_upper_bound_flop.capacity_upper_bound_operations
+            op: "=="
+            value: 0
+          - metric: electrical_service_capacity_fraction_required
+            op: "<"
+            value_ref: min_required_service_capacity_fraction
+        none:
+          - metric: documented_alternative_capacity_score
+            op: ">="
+            value_ref: alternative_capacity_suppression_score
+      missing_data_behavior: "If installation or electrical-service records are absent rather than contradictory, emit `records_missing` with high review priority instead of deterministic impossibility."
+      severity_mapping:
+        high: "Activity predates one required physical prerequisite, but records are incomplete or alternate capacity is plausible."
+        critical: "Activity predates installed/energized capacity by more than grace period and no alternate capacity is documented."
+      benign_suppression_conditions:
+        - id: alternate_site_or_scope
+          metric: documented_alternative_capacity_score
+          op: ">="
+          value_ref: alternative_capacity_suppression_score
+        - id: records_lag
+          metric: source_record_lag_seconds
+          op: "<="
+          value_ref: max_record_lag_seconds
+      calibration_defaults:
+        - name: min_activity_or_claim_score
+          value: 0.50
+          unit: score_0_to_1
+          evidence_status: calibration_default
+          rationale: "Requires material observed activity or a concrete claim before applying physical-timeline contradiction."
+          counterevidence_or_failure_modes: ["weak public claims can be misdated"]
+          calibration_note: "Define claim confidence and activity materiality per evidence source."
+        - name: negative_grace_period_seconds
+          value: -3600
+          unit: seconds
+          evidence_status: calibration_default
+          rationale: "Allows one hour of clock and record-boundary uncertainty before critical contradiction."
+          counterevidence_or_failure_modes: ["record timestamps can lag by more than one hour"]
+          calibration_note: "Replace with source-specific timestamp accuracy."
+        - name: min_required_service_capacity_fraction
+          value: 0.90
+          unit: fraction
+          evidence_status: calibration_default
+          rationale: "Threshold-scale activity should require nearly all modeled electrical service for the claimed capacity."
+          counterevidence_or_failure_modes: ["partial capacity may be enough for smaller claims", "temporary power can provide undocumented service"]
+          calibration_note: "Tune by electrical design and capacity model."
+        - name: alternative_capacity_suppression_score
+          value: 0.80
+          unit: score_0_to_1
+          evidence_status: calibration_default
+          rationale: "Documented alternate site, temporary generation, or out-of-scope capacity can suppress impossibility."
+          counterevidence_or_failure_modes: ["alternate-capacity records can be incomplete or ambiguous"]
+          calibration_note: "Calibrate with site and utility records."
+        - name: max_record_lag_seconds
+          value: 86400
+          unit: seconds
+          evidence_status: calibration_default
+          rationale: "Allows one day for administrative record lag before treating timeline as contradictory."
+          counterevidence_or_failure_modes: ["some public or permit records lag longer"]
+          calibration_note: "Replace with source-specific record-lag measurements."
+    benign_explanations_to_check:
+      - alternate_site_or_scope
+      - temporary_generation
+      - partial_service_or_hidden_feed
+      - records_lag
+      - asset_record_tracks_shipping_not_commissioning
+    output:
+      severity: critical
+      fields:
+        - claimed_or_observed_activity_window
+        - earliest_plausible_capacity_time
+        - missing_physical_prerequisite
+        - documented_alternative_capacity
+        - confidence
+
+  - id: claimed_compute_above_cap_adjusted_capacity
+    purpose: capacity_consistency_check
+    required_features:
+      - generic_achieved_operation_rate
+      - advertised_peak_rate_by_precision
+    optional_features:
+      - accelerator_count_by_family_sku
+      - instance_type_shape_machine_type
+      - accelerator_partitioning_intervals
+      - accelerator_power_cap_watts
+      - accelerator_core_clock_hz
+      - accelerator_performance_limit_state
+      - accelerator_health_error_state
+      - compute_running_intervals
+      - accelerator_compute_billing_usage_intervals
+    derived_signals:
+      - achieved_operation_integral
+      - capacity_upper_bound_flop
+      - cap_clock_power_factor
+    compared_time_windows: "Achieved-operation integral or external compute claim versus cap-adjusted capacity over the same scope/window."
+    triggering_condition: "Claimed or integrated achieved operations exceed conservative cap-adjusted capacity by more than measurement uncertainty."
+    trigger:
+      type: capacity_consistency_threshold_logic
+      evaluation_window: claim_capacity_overlap_window
+      source_refs: [S01, S03, S04, S05, S06, S07, S08, S09, S24]
+      conditions:
+        all:
+          - metric: achieved_operation_integral.unit_normalized
+            op: "=="
+            value: true
+          - metric: achieved_operation_integral.operation_count_to_capacity_upper_bound_ratio
+            op: ">"
+            value_ref: max_allowed_claim_to_capacity_ratio
+          - metric: capacity_upper_bound_flop.coverage_fraction
+            op: ">="
+            value_ref: min_capacity_coverage_fraction
+        none:
+          - metric: unit_mismatch_explanation_score
+            op: ">="
+            value_ref: unit_mismatch_suppression_score
+      missing_data_behavior: "If operation units are not normalized, emit unit_normalization_required and suppress critical severity until reviewed."
+      severity_mapping:
+        medium: "Exceedance ratio > 1.10 with incomplete coverage or plausible unit mismatch."
+        high: "Exceedance ratio > 1.10 with normalized units, high coverage, and no benign explanation."
+        critical: "Exceedance ratio > 1.25 with normalized units, coverage >= 0.90, and no hidden-capacity or unit explanation."
+      benign_suppression_conditions:
+        - id: operation_unit_mismatch
+          metric: unit_mismatch_explanation_score
+          op: ">="
+          value_ref: unit_mismatch_suppression_score
+        - id: hidden_unmonitored_capacity
+          metric: hidden_capacity_explanation_score
+          op: ">="
+          value_ref: hidden_capacity_suppression_score
+      calibration_defaults:
+        - name: max_allowed_claim_to_capacity_ratio
+          value: 1.10
+          unit: ratio
+          evidence_status: calibration_default
+          rationale: "Allows measurement uncertainty while flagging claims above conservative cap-adjusted capacity."
+          counterevidence_or_failure_modes: ["unit mismatch, mixed precision definitions, or hidden capacity can create apparent exceedance"]
+          calibration_note: "Replace with source-specific uncertainty and unit-normalization model."
+        - name: min_capacity_coverage_fraction
+          value: 0.90
+          unit: fraction
+          evidence_status: calibration_default
+          rationale: "Capacity contradiction requires high coverage of inventory, peak-rate, cap, and availability inputs."
+          counterevidence_or_failure_modes: ["missing inventory can understate capacity"]
+          calibration_note: "Calibrate with inventory and source completeness."
+        - name: unit_mismatch_suppression_score
+          value: 0.70
+          unit: score_0_to_1
+          evidence_status: project_assumption
+          rationale: "Strong evidence of unit mismatch should suppress high severity until normalized."
+          counterevidence_or_failure_modes: ["unit mismatch can be claimed opportunistically"]
+          calibration_note: "Define unit-normalization evidence required by source type."
+        - name: hidden_capacity_suppression_score
+          value: 0.80
+          unit: score_0_to_1
+          evidence_status: project_assumption
+          rationale: "Documented hidden or out-of-scope capacity can explain an apparent exceedance."
+          counterevidence_or_failure_modes: ["unverified hidden capacity should not clear the discrepancy"]
+          calibration_note: "Tie to provider/physical records and monitored-boundary definition."
+    benign_explanations_to_check:
+      - operation_unit_mismatch
+      - sparse_or_mixed_precision_peak_mode
+      - inventory_scope_mismatch
+      - counter_rollover_or_reset
+      - hidden_or_unmonitored_capacity
+    output:
+      severity: critical
+      fields:
+        - operation_count
+        - capacity_upper_bound_operations
+        - exceedance_ratio
+        - limiting_assumption
+        - unit_normalization_status
+
+  - id: telemetry_gap_during_candidate_training_window
+    purpose: missingness_integrity_check
+    required_features:
+      - allocated_accelerator_count_by_sku
+      - compute_running_intervals
+    optional_features:
+      - tensor_matrix_mxu_neuron_or_engine_active_fraction
+      - generic_achieved_operation_rate
+      - accelerator_busy_or_utilization_fraction
+      - scaleout_port_tx_rx_bytes_packets
+      - fabric_port_device_sample_counters
+      - storage_write_operation_bytes
+      - object_storage_operation_counts
+      - accelerator_device_power_energy
+      - rack_pdu_it_power
+      - vpc_or_nsg_flow_records
+      - maintenance_operation_intervals
+      - physical_access_events
+    derived_signals:
+      - telemetry_coverage_fraction
+    compared_time_windows: "Candidate allocation/running window versus expected telemetry coverage for primary activity, fabric, storage, network, power, and billing channels."
+    triggering_condition: "One or more primary channels have low coverage exactly during a candidate large training window."
+    trigger:
+      type: missingness_threshold_logic
+      evaluation_window: candidate_training_or_large_compute_window
+      source_refs: [S07, S08, S27, S28, S29, S30, S31, S35, S36, S37, S38, S39, S42, S43]
+      conditions:
+        all:
+          - metric: candidate_window_score
+            op: ">="
+            value_ref: min_candidate_window_score
+          - metric: telemetry_coverage_fraction.primary_channel_min
+            op: "<"
+            value_ref: min_required_primary_coverage_fraction
+        any:
+          - metric: missing_channel_importance_score
+            op: ">="
+            value_ref: min_missing_channel_importance_score
+          - metric: telemetry_gap_overlap_fraction
+            op: ">="
+            value_ref: min_gap_overlap_fraction
+      missing_data_behavior: "The missing data is the finding; do not infer absence of training, serving, or storage activity from the gap."
+      severity_mapping:
+        medium: "One support channel is below coverage threshold during a weak candidate window."
+        high: "A primary activity, fabric, storage, serving, power, or billing channel is below coverage threshold during a medium/strong candidate window."
+        critical: "Multiple primary channels gap during a policy-scale achieved-ops or strong core candidate window and coincide with physical access or maintenance not otherwise explained."
+      benign_suppression_conditions:
+        - id: documented_collector_outage
+          metric: documented_collector_outage_overlap_fraction
+          op: ">="
+          value_ref: benign_gap_overlap_fraction
+        - id: planned_maintenance
+          metric: maintenance_operation_overlap_fraction
+          op: ">="
+          value_ref: benign_gap_overlap_fraction
+      calibration_defaults:
+        - name: min_candidate_window_score
+          value: 0.50
+          unit: score_0_to_1
+          evidence_status: project_assumption
+          rationale: "Telemetry gaps are escalated only when they overlap a candidate window."
+          counterevidence_or_failure_modes: ["weak candidate scoring can miss important gaps"]
+          calibration_note: "Calibrate candidate score from core rule outputs."
+        - name: min_required_primary_coverage_fraction
+          value: 0.75
+          unit: fraction
+          evidence_status: source_informed
+          rationale: "Primary channels below this coverage materially weaken verification."
+          counterevidence_or_failure_modes: ["some sources are sampled by design and need adjusted expectations"]
+          calibration_note: "Replace with expected source coverage by channel."
+        - name: min_missing_channel_importance_score
+          value: 0.60
+          unit: score_0_to_1
+          evidence_status: project_assumption
+          rationale: "Prioritizes missing channels that would materially affect the candidate label."
+          counterevidence_or_failure_modes: ["importance depends on rule path and available alternate channels"]
+          calibration_note: "Calibrate from evidence-combination model."
+        - name: min_gap_overlap_fraction
+          value: 0.50
+          unit: fraction
+          evidence_status: calibration_default
+          rationale: "Gap should cover a material fraction of the candidate window."
+          counterevidence_or_failure_modes: ["short gaps can hide decisive bursts"]
+          calibration_note: "Tune by sampling interval and burst duration."
+        - name: benign_gap_overlap_fraction
+          value: 0.80
+          unit: fraction
+          evidence_status: calibration_default
+          rationale: "Documented outages or maintenance can lower integrity severity when they explain most of the gap."
+          counterevidence_or_failure_modes: ["planned outages can coincide with attempted evasion"]
+          calibration_note: "Tune with collector outage and maintenance records."
+    benign_explanations_to_check:
+      - collector_outage
+      - log_configuration_disabled
+      - provider_best_effort_delay
+      - maintenance_or_firmware_update
+      - physical_access_or_device_swap
+    output:
+      severity: high
+      fields:
+        - candidate_window
+        - missing_channels
+        - coverage_fraction_by_channel
+        - strongest_unobserved_channel
+        - explanations_checked
+
+  - id: route_or_topology_change_during_candidate_window
+    purpose: attribution_and_coverage_check
+    required_features:
+      - topology_change_events
+      - scaleout_port_tx_rx_bytes_packets
+    optional_features:
+      - network_gateway_nat_route_state
+      - scaleout_fabric_domain_graph
+      - cross_site_or_dci_connectivity
+      - vpc_or_nsg_flow_records
+      - east_west_internal_flow_bytes
+      - rdma_congestion_retry_drop_error_counters
+      - fabric_port_device_sample_counters
+      - maintenance_operation_intervals
+    derived_signals:
+      - largest_usable_topology_domain
+      - clock_aligned_overlap_window
+    compared_time_windows: "Route, NAT, firewall, fabric, or topology changes versus candidate fabric/activity windows."
+    triggering_condition: "A topology or route change coincides with candidate activity, missing traffic, shifted paths, or changed participant sets."
+    trigger:
+      type: topology_change_threshold_logic
+      evaluation_window: candidate_activity_with_topology_change_window
+      source_refs: [S25, S28, S29, S30, S42, S43]
+      conditions:
+        all:
+          - metric: topology_or_route_change_overlap_fraction
+            op: ">="
+            value_ref: min_change_overlap_fraction
+          - metric: visibility_or_participant_impact_score
+            op: ">="
+            value_ref: min_visibility_impact_score
+        any:
+          - metric: stable_participant_set.churn_fraction
+            op: ">="
+            value_ref: min_participant_churn_fraction
+          - metric: telemetry_coverage_fraction.fabric_or_flow
+            op: "<"
+            value_ref: min_fabric_or_flow_coverage_fraction
+      missing_data_behavior: "If topology-change records are unavailable, do not clear fabric-mapping discrepancies; emit topology_change_coverage_unknown."
+      severity_mapping:
+        low: "Change overlaps candidate window but no visibility or participant impact is measured."
+        medium: "Change overlaps and impacts participant set, flow visibility, or mapping."
+        high: "Change overlaps a medium/strong candidate and coincides with fabric/flow coverage loss or participant remap without maintenance explanation."
+      benign_suppression_conditions:
+        - id: routine_network_maintenance
+          metric: maintenance_operation_overlap_fraction
+          op: ">="
+          value_ref: benign_change_overlap_fraction
+        - id: planned_capacity_expansion
+          metric: planned_change_score
+          op: ">="
+          value_ref: planned_change_suppression_score
+      calibration_defaults:
+        - name: min_change_overlap_fraction
+          value: 0.10
+          unit: fraction
+          evidence_status: calibration_default
+          rationale: "Topology events are discrete; even partial overlap can affect attribution."
+          counterevidence_or_failure_modes: ["event timestamps can be imprecise"]
+          calibration_note: "Tune by topology event time accuracy."
+        - name: min_visibility_impact_score
+          value: 0.50
+          unit: score_0_to_1
+          evidence_status: calibration_default
+          rationale: "Only changes that plausibly affect mapping or visibility should escalate."
+          counterevidence_or_failure_modes: ["impact may be unknown or delayed"]
+          calibration_note: "Calibrate from network operations records."
+        - name: min_participant_churn_fraction
+          value: 0.20
+          unit: fraction
+          evidence_status: calibration_default
+          rationale: "Material participant-set change during candidate window is attribution-relevant."
+          counterevidence_or_failure_modes: ["elastic jobs and failures can churn normally"]
+          calibration_note: "Tune by scheduler and topology behavior."
+        - name: min_fabric_or_flow_coverage_fraction
+          value: 0.75
+          unit: fraction
+          evidence_status: source_informed
+          rationale: "Flow or fabric visibility below this during route change weakens attribution."
+          counterevidence_or_failure_modes: ["provider flow logs can be sampled or delayed"]
+          calibration_note: "Replace with source coverage expectations."
+        - name: benign_change_overlap_fraction
+          value: 0.80
+          unit: fraction
+          evidence_status: calibration_default
+          rationale: "Maintenance should cover most of the change impact before lowering severity."
+          counterevidence_or_failure_modes: ["maintenance can mask unrelated activity"]
+          calibration_note: "Tune by maintenance record precision."
+        - name: planned_change_suppression_score
+          value: 0.80
+          unit: score_0_to_1
+          evidence_status: project_assumption
+          rationale: "Planned, documented changes lower integrity concern."
+          counterevidence_or_failure_modes: ["planned changes can still affect verification visibility"]
+          calibration_note: "Define from network change-management records."
+    benign_explanations_to_check:
+      - routine_network_maintenance
+      - failure_recovery
+      - planned_capacity_expansion
+      - policy_change
+      - monitoring_path_change
+    output:
+      severity: medium
+      fields:
+        - change_event_time
+        - affected_scope
+        - candidate_window_overlap
+        - visibility_impact
+        - explanation_status
+
+  - id: high_fabric_activity_storage_or_backup_explanation
+    purpose: false_positive_or_explanation_check
+    required_features:
+      - scaleout_port_tx_rx_bytes_packets
+      - storage_operation_intervals
+    optional_features:
+      - storage_read_operation_bytes
+      - storage_write_operation_bytes
+      - object_or_file_copy_movement_records
+      - filesystem_throughput_metadata_ops
+      - east_west_internal_flow_bytes
+      - data_center_interconnect_wan_usage
+      - vpc_or_nsg_flow_records
+    derived_signals:
+      - storage_staging_window
+    compared_time_windows: "High fabric/internal/WAN activity versus storage backup, rebuild, restore, replication, migration, or copy intervals."
+    triggering_condition: "Fabric activity that could be mistaken for collective traffic overlaps a storage operation capable of explaining the bytes."
+    trigger:
+      type: explanation_threshold_logic
+      evaluation_window: fabric_storage_overlap_window
+      source_refs: [S28, S29, S31, S32, S33, S34, S35]
+      conditions:
+        all:
+          - metric: high_fabric_or_internal_flow_score
+            op: ">="
+            value_ref: min_fabric_or_flow_score
+          - metric: storage_operation_intervals.operation_type
+            op: in
+            value_ref: explanatory_storage_operation_types
+          - metric: storage_operation_overlap_fraction
+            op: ">="
+            value_ref: min_storage_operation_overlap_fraction
+          - metric: bytes_explained_fraction
+            op: ">="
+            value_ref: min_bytes_explained_fraction
+      missing_data_behavior: "If storage-operation labels are missing, emit `explanation_unavailable`; do not suppress fabric-training evidence solely from raw storage bytes."
+      severity_mapping:
+        info: "Storage operation explains most fabric/internal/WAN activity."
+        low: "Storage operation partly explains activity, residual bytes remain."
+        medium: "High fabric activity remains unexplained after storage bytes are subtracted."
+      benign_suppression_conditions:
+        - id: storage_operation_explains_bytes
+          metric: bytes_explained_fraction
+          op: ">="
+          value_ref: min_bytes_explained_fraction
+      calibration_defaults:
+        - name: min_fabric_or_flow_score
+          value: 0.50
+          unit: score_0_to_1
+          evidence_status: calibration_default
+          rationale: "Explanation check applies to material normalized fabric/internal/WAN activity."
+          counterevidence_or_failure_modes: ["small but meaningful collective bursts can be below this"]
+          calibration_note: "Calibrate by fabric and flow baselines."
+        - name: explanatory_storage_operation_types
+          value: [backup, restore, rebuild, replication, migration, disaster_recovery, object_copy, etl_export]
+          unit: categorical_set
+          evidence_status: source_informed
+          rationale: "Explicit operation types can explain storage-driven network traffic."
+          counterevidence_or_failure_modes: ["operation labels may be broad"]
+          calibration_note: "Normalize provider and storage labels."
+        - name: min_storage_operation_overlap_fraction
+          value: 0.80
+          unit: fraction
+          evidence_status: calibration_default
+          rationale: "Storage operation should overlap most suspicious traffic."
+          counterevidence_or_failure_modes: ["coarse operation intervals can over-explain"]
+          calibration_note: "Tune by operation interval precision."
+        - name: min_bytes_explained_fraction
+          value: 0.70
+          unit: fraction
+          evidence_status: calibration_default
+          rationale: "Most bytes should be explainable before lowering training suspicion."
+          counterevidence_or_failure_modes: ["shared links can mix storage and accelerator traffic"]
+          calibration_note: "Use route/path and byte attribution calibration."
+    benign_explanations_to_check:
+      - backup
+      - restore
+      - storage_rebuild
+      - replication
+      - migration
+      - disaster_recovery
+    output:
+      severity: info
+      fields:
+        - fabric_window
+        - storage_operation_type
+        - explained_bytes
+        - unexplained_bytes
+        - effect_on_training_label
+
+  - id: high_activity_during_health_or_throttle_degraded_state
+    purpose: capacity_activity_consistency_check
+    required_features:
+      - accelerator_health_error_state
+      - tensor_matrix_mxu_neuron_or_engine_active_fraction
+    optional_features:
+      - accelerator_throttle_state
+      - accelerator_performance_limit_state
+      - accelerator_power_limit_active
+      - accelerator_thermal_limit_active
+      - power_cap_violation_throttle_state
+      - local_link_error_recovery_throttle
+      - rdma_congestion_retry_drop_error_counters
+      - generic_achieved_operation_rate
+      - accelerator_busy_or_utilization_fraction
+    derived_signals:
+      - cap_clock_power_factor
+      - available_accelerator_fraction
+      - sustained_accelerator_activity_window
+    compared_time_windows: "Activity/achieved-rate window versus health, throttle, thermal, power-limit, and link-degraded intervals."
+    triggering_condition: "High claimed or observed activity conflicts with degraded devices, active throttling, active limits, or link failure states."
+    trigger:
+      type: capacity_activity_consistency_threshold_logic
+      evaluation_window: degraded_state_activity_overlap_window
+      source_refs: [S07, S08, S09, S42, S43]
+      conditions:
+        all:
+          - metric: sustained_accelerator_activity_window.activity_score
+            op: ">="
+            value_ref: min_high_activity_score
+          - metric: degraded_or_limited_affected_fraction
+            op: ">="
+            value_ref: min_affected_fraction
+          - metric: degraded_activity_overlap_fraction
+            op: ">="
+            value_ref: min_degraded_activity_overlap_fraction
+        any:
+          - metric: achieved_operation_integral.operation_count_to_capacity_upper_bound_ratio
+            op: ">"
+            value_ref: max_degraded_capacity_ratio
+          - metric: cap_clock_power_factor.cap_clock_power_factor
+            op: "<="
+            value_ref: max_cap_clock_power_factor_for_conflict
+      missing_data_behavior: "If health/throttle coverage is missing, emit coverage caveat and route to telemetry-gap review rather than clearing high activity."
+      severity_mapping:
+        medium: "High activity overlaps degraded/limited state but affected fraction or capacity conflict is modest."
+        high: "High activity conflicts with degraded adjusted capacity over most of the window."
+        critical: "Claimed achieved operations exceed degraded cap-adjusted capacity by > 25% with high coverage."
+      benign_suppression_conditions:
+        - id: partial_device_set_affected
+          metric: unaffected_activity_fraction
+          op: ">="
+          value_ref: min_unaffected_activity_fraction
+        - id: transient_non_material_limit
+          metric: degraded_state_duration_seconds
+          op: "<="
+          value_ref: max_transient_degraded_duration_seconds
+      calibration_defaults:
+        - name: min_high_activity_score
+          value: 0.70
+          unit: score_0_to_1
+          evidence_status: calibration_default
+          rationale: "Conflict requires clear high activity or claim."
+          counterevidence_or_failure_modes: ["activity scores can be inflated by proxy estimates"]
+          calibration_note: "Calibrate by device and counter source."
+        - name: min_affected_fraction
+          value: 0.20
+          unit: fraction
+          evidence_status: calibration_default
+          rationale: "At least a material fraction of devices or links must be degraded for a window-level conflict."
+          counterevidence_or_failure_modes: ["one critical link can affect more than its fraction suggests"]
+          calibration_note: "Tune by topology and failure impact."
+        - name: min_degraded_activity_overlap_fraction
+          value: 0.50
+          unit: fraction
+          evidence_status: calibration_default
+          rationale: "Degraded state should overlap material activity."
+          counterevidence_or_failure_modes: ["short severe events can still matter"]
+          calibration_note: "Tune by telemetry interval and failure duration."
+        - name: max_degraded_capacity_ratio
+          value: 1.10
+          unit: ratio
+          evidence_status: calibration_default
+          rationale: "Allows uncertainty while flagging activity above degraded adjusted capacity."
+          counterevidence_or_failure_modes: ["capacity model can be conservative or unit-mismatched"]
+          calibration_note: "Replace with cap-adjusted uncertainty model."
+        - name: max_cap_clock_power_factor_for_conflict
+          value: 0.80
+          unit: fraction
+          evidence_status: calibration_default
+          rationale: "Active limits reducing capacity by 20% or more should be considered in high-activity consistency."
+          counterevidence_or_failure_modes: ["some limit states are non-binding"]
+          calibration_note: "Calibrate with per-SKU cap/performance data."
+        - name: min_unaffected_activity_fraction
+          value: 0.80
+          unit: fraction
+          evidence_status: calibration_default
+          rationale: "If most activity maps to unaffected devices, lower severity."
+          counterevidence_or_failure_modes: ["mapping can be incomplete"]
+          calibration_note: "Tune by device-to-job mapping accuracy."
+        - name: max_transient_degraded_duration_seconds
+          value: 120
+          unit: seconds
+          evidence_status: calibration_default
+          rationale: "Very short degraded events may not materially constrain the activity window."
+          counterevidence_or_failure_modes: ["short resets can still disrupt training"]
+          calibration_note: "Replace with failure impact analysis."
+    benign_explanations_to_check:
+      - partial_device_set_affected
+      - transient_non_material_limit
+      - counter_scope_mismatch
+      - automatic_recovery
+      - conservative_limit_state
+    output:
+      severity: medium
+      fields:
+        - degraded_window
+        - affected_fraction
+        - observed_activity
+        - capacity_reduction_factor
+        - explanation_status
+
+  - id: power_cooling_physical_mismatch
+    purpose: physical_consistency_check
+    required_features:
+      - rack_pdu_it_power
+      - inlet_outlet_air_or_coolant_temperature
+    optional_features:
+      - accelerator_device_power_energy
+      - server_system_input_power
+      - facility_or_room_it_power_rollup
+      - coolant_flow_rate
+      - coolant_pressure
+      - pump_speed_or_state
+      - valve_position_or_state
+      - fan_speed_rpm_or_percent
+      - airflow_rate
+      - thermal_control_mode
+      - hvac_control_mode
+      - economizer_state
+      - outdoor_air_temperature_celsius
+      - outdoor_humidity_percent
+      - cooling_alarm_state
+    derived_signals:
+      - clock_aligned_overlap_window
+    compared_time_windows: "IT power window versus lag-normalized heat-removal, airflow, coolant, and control-mode signals."
+    triggering_condition: "Power and cooling/thermal signals are physically inconsistent for the mapped rack, row, room, or facility scope."
+    benign_explanations_to_check:
+      - sensor_scope_mismatch
+      - fixed_flow_or_fixed_fan_policy
+      - ambient_or_economizer_transition
+      - cooling_fault_or_alarm
+      - mixed_tenant_heat_load
+    output:
+      severity: medium
+      fields:
+        - affected_scope
+        - power_window
+        - thermal_response_summary
+        - control_mode_context
+        - explanation_status
+
+  - id: quota_reservation_usage_mismatch
+    purpose: cloud_control_plane_consistency_check
+    required_features:
+      - quota_limit_intervals
+      - accelerator_compute_billing_usage_intervals
+    optional_features:
+      - capacity_reservation_intervals
+      - accelerator_reservation_billing_usage_intervals
+      - capacity_exception_events
+      - compute_running_intervals
+      - instance_type_shape_machine_type
+      - reservation_state_intervals
+    derived_signals:
+      - capacity_upper_bound_flop
+    compared_time_windows: "Quota/reservation/billing/running intervals for the same provider account, project, region, zone, or placement scope."
+    triggering_condition: "Observed running or billed accelerator usage exceeds enforced quota or contradicts reservation/capacity-exception records."
+    benign_explanations_to_check:
+      - quota_change_not_in_interval_feed
+      - reserved_capacity_exception
+      - cross_account_or_project_split
+      - billing_aggregation_delay
+      - provider_scope_mismatch
+    output:
+      severity: medium
+      fields:
+        - provider_scope
+        - usage_quantity
+        - quota_bound
+        - reservation_context
+        - mismatch_reason
+
+  - id: physical_access_near_telemetry_or_inventory_gap
+    purpose: provenance_integrity_check
+    required_features:
+      - physical_access_events
+    optional_features:
+      - inventory_lifecycle_events
+      - asset_receiving_installation_events
+      - maintenance_operation_intervals
+      - accelerator_health_error_state
+      - topology_change_events
+      - accelerator_count_by_family_sku
+    derived_signals:
+      - telemetry_coverage_fraction
+    compared_time_windows: "Physical access events versus inventory changes, device health/reset events, topology events, and telemetry coverage gaps."
+    triggering_condition: "Physical access occurs immediately before, during, or after inventory changes, collector gaps, resets, or unexplained topology changes."
+    benign_explanations_to_check:
+      - scheduled_repair
+      - cabling_or_installation_work
+      - inspection
+      - break_fix_ticket
+      - spare_swap
+    output:
+      severity: medium
+      fields:
+        - access_event_time
+        - affected_scope
+        - nearby_inventory_or_telemetry_event
+        - maintenance_linkage
+        - review_priority

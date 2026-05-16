@@ -1,0 +1,435 @@
+schema_version: "0.1"
+created: "2026-05-16"
+source_inventory: observables/observables.yaml
+status: study_algorithm_rule_spec
+
+feature_rule_index:
+  - observable_id: O01
+    feature_id: accelerator_count_by_family_sku
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_capacity_upper_bound_flop, cap_accelerator_sku_capability, cap_electrical_installation_timeline, activity_before_installation_or_electrical_service, capacity_threshold_possible, capacity_threshold_ruled_out]
+    notes: "Base installed-capacity count; never workload identity by itself."
+  - observable_id: O01
+    feature_id: memory_capacity_bytes
+    roles: [capacity, training_support, discrepancy]
+    used_by_rules: [cap_accelerator_sku_capability, memory_residency_support, checkpoint_training_signature]
+    notes: "Bounds feasibility and checkpoint-size plausibility, but inference can also use large memory."
+  - observable_id: O01
+    feature_id: memory_bandwidth_bytes_per_sec
+    roles: [capacity, training_support, discrepancy]
+    used_by_rules: [cap_accelerator_sku_capability, memory_bandwidth_activity_support]
+    notes: "Capability/support feature; observed activity is handled by memory_bandwidth_or_dram_active."
+  - observable_id: O01
+    feature_id: advertised_peak_rate_by_precision
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_capacity_upper_bound_flop, cap_accelerator_sku_capability, cap_negative_certification_inputs, claimed_compute_above_cap_adjusted_capacity, capacity_threshold_possible, capacity_threshold_ruled_out]
+    notes: "Source-backed peak rate for upper bounds and sanity checks."
+  - observable_id: O01
+    feature_id: accelerator_partitioning_intervals
+    roles: [capacity, training_support, discrepancy]
+    used_by_rules: [cap_capacity_upper_bound_flop, cap_partition_adjustment, partition_shape_context, claimed_compute_above_cap_adjusted_capacity]
+    notes: "Reduces capacity and contextualizes whether a single large synchronized run is plausible."
+  - observable_id: O01
+    feature_id: accelerator_power_cap_watts
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_capacity_upper_bound_flop, cap_power_clock_limit_adjustment, claimed_compute_above_cap_adjusted_capacity]
+    notes: "Power caps lower feasible compute and check high-throughput claims."
+  - observable_id: O01
+    feature_id: accelerator_core_clock_hz
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_capacity_upper_bound_flop, cap_power_clock_limit_adjustment, claimed_compute_above_cap_adjusted_capacity]
+    notes: "Clock state modifies capacity and consistency with achieved operations."
+  - observable_id: O01
+    feature_id: accelerator_memory_clock_hz
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_capacity_upper_bound_flop, cap_power_clock_limit_adjustment]
+    notes: "Memory clock constrains memory-bandwidth capacity and throttle interpretation."
+  - observable_id: O01
+    feature_id: accelerator_p_state
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_capacity_upper_bound_flop, cap_power_clock_limit_adjustment]
+    notes: "P-state is a coarse plausibility check, not workload identity."
+  - observable_id: O01
+    feature_id: accelerator_throttle_state
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_power_clock_limit_adjustment, high_activity_during_health_or_throttle_degraded_state]
+    notes: "Explains reduced throughput and challenges impossible activity claims."
+  - observable_id: O01
+    feature_id: accelerator_performance_limit_state
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_power_clock_limit_adjustment, claimed_compute_above_cap_adjusted_capacity, high_activity_during_health_or_throttle_degraded_state]
+    notes: "Caps credible achieved compute during active limit intervals."
+  - observable_id: O01
+    feature_id: inventory_lifecycle_events
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_electrical_installation_timeline, cap_health_degraded_device_adjustment, activity_before_installation_or_electrical_service, physical_access_near_telemetry_or_inventory_gap]
+    notes: "Updates capacity timeline and flags activity around inventory changes."
+  - observable_id: O01
+    feature_id: accelerator_health_error_state
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_capacity_upper_bound_flop, cap_health_degraded_device_adjustment, claimed_compute_above_cap_adjusted_capacity, high_activity_during_health_or_throttle_degraded_state, physical_access_near_telemetry_or_inventory_gap]
+    notes: "Removes degraded devices from capacity and explains gaps, retries, and resets."
+
+  - observable_id: O02
+    feature_id: local_accelerator_interconnect_domain
+    roles: [capacity, training_support, discrepancy]
+    used_by_rules: [cap_accelerator_sku_capability, cap_topology_domain_constraint, topology_training_context]
+    notes: "Local fabric capability supports plausibility only with observed aligned traffic."
+  - observable_id: O02
+    feature_id: scaleout_fabric_domain_graph
+    roles: [capacity, training_support, discrepancy]
+    used_by_rules: [cap_accelerator_sku_capability, cap_topology_domain_constraint, topology_training_context, route_or_topology_change_during_candidate_window]
+    notes: "Bounds largest connected domain; observed traffic is required for training evidence."
+  - observable_id: O02
+    feature_id: cross_site_or_dci_connectivity
+    roles: [capacity, training_support, discrepancy]
+    used_by_rules: [cap_topology_domain_constraint, topology_training_context, route_or_topology_change_during_candidate_window]
+    notes: "Usually supports staging/replication or multi-site plausibility more than tight synchronous training."
+  - observable_id: O02
+    feature_id: topology_change_events
+    roles: [capacity, training_support, discrepancy]
+    used_by_rules: [cap_topology_domain_constraint, topology_training_context, route_or_topology_change_during_candidate_window, physical_access_near_telemetry_or_inventory_gap]
+    notes: "Splits topology validity and explains changed visibility or participant sets."
+
+  - observable_id: O03
+    feature_id: allocated_accelerator_count_by_sku
+    roles: [capacity, training_core, training_support, discrepancy]
+    used_by_rules: [cap_capacity_upper_bound_flop, collective_cadence_training, checkpoint_training_signature, sustained_ml_compute_nonserving, achieved_ops_training_candidate, high_gpu_activity_no_allocation, telemetry_gap_during_candidate_training_window, allocated_activity_candidate, allocated_activity_fabric_training_candidate, allocated_activity_checkpoint_training_candidate]
+    notes: "Core candidate window and capacity input; allocation alone is not training."
+  - observable_id: O03
+    feature_id: reservation_state_intervals
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_cloud_capacity_constraint, quota_reservation_usage_mismatch]
+    notes: "Reservation indicates capacity availability, not activity."
+  - observable_id: O03
+    feature_id: allocation_preemption_events
+    roles: [training_support, discrepancy]
+    used_by_rules: [lifecycle_preemption_context]
+    notes: "Explains restarts, interruptions, and checkpoint bursts."
+
+  - observable_id: O04
+    feature_id: instance_type_shape_machine_type
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_capacity_upper_bound_flop, cap_accelerator_sku_capability, cap_cloud_capacity_constraint, claimed_compute_above_cap_adjusted_capacity, quota_reservation_usage_mismatch]
+    notes: "Cloud equivalent of hardware inventory and topology context."
+  - observable_id: O04
+    feature_id: compute_running_intervals
+    roles: [capacity, training_core, training_support, discrepancy]
+    used_by_rules: [cap_cloud_capacity_constraint, collective_cadence_training, checkpoint_training_signature, sustained_ml_compute_nonserving, achieved_ops_training_candidate, high_gpu_activity_no_allocation, telemetry_gap_during_candidate_training_window, running_activity_candidate, running_activity_fabric_training_candidate]
+    notes: "Core running window; activity and identity require additional evidence."
+  - observable_id: O04
+    feature_id: capacity_reservation_intervals
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_cloud_capacity_constraint, quota_reservation_usage_mismatch]
+    notes: "Availability support and cloud consistency check."
+  - observable_id: O04
+    feature_id: quota_limit_intervals
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_cloud_capacity_constraint, quota_reservation_usage_mismatch]
+    notes: "Capacity upper bound only when enforced and scope-matched."
+  - observable_id: O04
+    feature_id: capacity_exception_events
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_cloud_capacity_constraint, quota_reservation_usage_mismatch]
+    notes: "Supports unavailable-capacity claims only for the same request scope."
+  - observable_id: O04
+    feature_id: accelerator_compute_billing_usage_intervals
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_cloud_capacity_constraint, cap_negative_certification_inputs, high_gpu_activity_no_allocation, claimed_compute_above_cap_adjusted_capacity, quota_reservation_usage_mismatch]
+    notes: "Resource-use record; not training identity without activity and shape evidence."
+  - observable_id: O04
+    feature_id: accelerator_reservation_billing_usage_intervals
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_cloud_capacity_constraint, quota_reservation_usage_mismatch]
+    notes: "Paid or held capacity, not observed work."
+
+  - observable_id: O05
+    feature_id: accelerator_busy_or_utilization_fraction
+    roles: [training_core, training_support, discrepancy]
+    used_by_rules: [collective_cadence_training, checkpoint_training_signature, sustained_ml_compute_nonserving, achieved_ops_training_candidate, high_power_low_gpu_activity, high_activity_during_health_or_throttle_degraded_state, memory_bandwidth_activity_support, activity_only_screen, allocated_activity_candidate, running_activity_candidate, activity_fabric_cadence_candidate, activity_checkpoint_candidate, activity_nonserving_candidate, allocated_activity_fabric_training_candidate, running_activity_fabric_training_candidate, allocated_activity_checkpoint_training_candidate, serving_suppression, benchmark_like_suppression]
+    notes: "Generic activity; requires identity evidence before training classification."
+  - observable_id: O05
+    feature_id: tensor_matrix_mxu_neuron_or_engine_active_fraction
+    roles: [training_core, training_support, discrepancy]
+    used_by_rules: [collective_cadence_training, checkpoint_training_signature, sustained_ml_compute_nonserving, achieved_ops_training_candidate, high_gpu_activity_no_allocation, high_activity_during_health_or_throttle_degraded_state, power_thermal_physical_support, activity_only_screen, allocated_activity_candidate, running_activity_candidate, activity_fabric_cadence_candidate, activity_checkpoint_candidate, activity_nonserving_candidate, allocated_activity_fabric_training_candidate, running_activity_fabric_training_candidate, allocated_activity_checkpoint_training_candidate, serving_suppression, benchmark_like_suppression]
+    notes: "Strong accelerator activity channel but can also be inference or benchmarks."
+  - observable_id: O05
+    feature_id: hbm_or_device_memory_used
+    roles: [capacity, training_support, discrepancy]
+    used_by_rules: [memory_residency_support, partition_shape_context]
+    notes: "Large model context when dynamic and aligned with activity."
+  - observable_id: O05
+    feature_id: memory_bandwidth_or_dram_active
+    roles: [training_support, discrepancy]
+    used_by_rules: [memory_bandwidth_activity_support]
+    notes: "Supportive only when aligned with tensor activity or training phases."
+  - observable_id: O05
+    feature_id: accelerator_temperature_celsius
+    roles: [training_support, discrepancy]
+    used_by_rules: [cap_power_clock_limit_adjustment, power_thermal_physical_support]
+    notes: "Physical support and throttle context, not workload identity."
+  - observable_id: O05
+    feature_id: accelerator_power_limit_active
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_power_clock_limit_adjustment, high_activity_during_health_or_throttle_degraded_state]
+    notes: "Reduces credible capacity and explains lower throughput."
+  - observable_id: O05
+    feature_id: accelerator_thermal_limit_active
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_power_clock_limit_adjustment, high_activity_during_health_or_throttle_degraded_state]
+    notes: "Thermal cap and health consistency check."
+
+  - observable_id: O06
+    feature_id: generic_achieved_operation_rate
+    roles: [capacity, training_core, discrepancy]
+    used_by_rules: [achieved_ops_training_candidate, sustained_ml_compute_nonserving, collective_cadence_training, high_power_low_gpu_activity, claimed_compute_above_cap_adjusted_capacity, high_activity_during_health_or_throttle_degraded_state, activity_only_screen, large_compute_screen, allocated_activity_candidate, running_activity_candidate, activity_fabric_cadence_candidate, activity_checkpoint_candidate, activity_nonserving_candidate, allocated_activity_fabric_training_candidate, running_activity_fabric_training_candidate, allocated_activity_checkpoint_training_candidate, ops_fabric_training_candidate, ops_checkpoint_training_candidate, serving_suppression, benchmark_like_suppression]
+    notes: "Best lower-bound activity channel when units and coverage are trustworthy."
+
+  - observable_id: O07
+    feature_id: local_interconnect_tx_rx_bytes
+    roles: [training_core, training_support, discrepancy]
+    used_by_rules: [collective_cadence_training, achieved_ops_training_candidate, topology_training_context, benchmark_like_collective_counterevidence, hpc_mpi_collective_alternative, activity_fabric_cadence_candidate, ops_fabric_training_candidate, benchmark_like_suppression]
+    notes: "Supports local tensor/pipeline/FSDP communication when aligned with compute."
+  - observable_id: O07
+    feature_id: local_link_error_recovery_throttle
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_health_degraded_device_adjustment, cap_topology_domain_constraint, high_activity_during_health_or_throttle_degraded_state]
+    notes: "Explains link-level throughput changes and reduced topology capacity."
+
+  - observable_id: O08
+    feature_id: scaleout_port_tx_rx_bytes_packets
+    roles: [training_core, training_support, discrepancy]
+    used_by_rules: [collective_cadence_training, achieved_ops_training_candidate, topology_training_context, benchmark_like_collective_counterevidence, hpc_mpi_collective_alternative, high_fabric_activity_no_job_mapping, route_or_topology_change_during_candidate_window, high_fabric_activity_storage_or_backup_explanation, activity_fabric_cadence_candidate, allocated_activity_fabric_training_candidate, running_activity_fabric_training_candidate, ops_fabric_training_candidate, storage_operation_suppression, benchmark_like_suppression]
+    notes: "Primary fabric activity channel; raw bandwidth alone is not training evidence."
+  - observable_id: O08
+    feature_id: rdma_congestion_retry_drop_error_counters
+    roles: [capacity, training_core, training_support, discrepancy]
+    used_by_rules: [collective_cadence_training, achieved_ops_training_candidate, topology_training_context, benchmark_like_collective_counterevidence, hpc_mpi_collective_alternative, cap_topology_domain_constraint, high_activity_during_health_or_throttle_degraded_state]
+    notes: "Supports heavy fabric use and explains throughput dips or link issues."
+  - observable_id: O08
+    feature_id: fabric_port_device_sample_counters
+    roles: [capacity, training_core, training_support, discrepancy]
+    used_by_rules: [collective_cadence_training, achieved_ops_training_candidate, topology_training_context, high_fabric_activity_no_job_mapping, route_or_topology_change_during_candidate_window, allocated_activity_fabric_training_candidate, running_activity_fabric_training_candidate, ops_fabric_training_candidate]
+    notes: "Enriches byte rules with vendor-specific counter semantics."
+
+  - observable_id: O09
+    feature_id: vpc_or_nsg_flow_records
+    roles: [training_core, training_support, discrepancy]
+    used_by_rules: [collective_cadence_training, checkpoint_training_signature, sustained_ml_compute_nonserving, achieved_ops_training_candidate, internal_data_movement_support, serving_heavy_network_counterevidence, telemetry_gap_during_candidate_training_window, route_or_topology_change_during_candidate_window, high_fabric_activity_storage_or_backup_explanation, activity_nonserving_candidate, serving_suppression]
+    notes: "General flow visibility for staging, serving counterevidence, and missingness."
+  - observable_id: O09
+    feature_id: east_west_internal_flow_bytes
+    roles: [training_support, discrepancy]
+    used_by_rules: [internal_data_movement_support, serving_heavy_network_counterevidence, high_fabric_activity_no_job_mapping, high_fabric_activity_storage_or_backup_explanation]
+    notes: "Supportive internal traffic, but often storage, service mesh, ETL, or inference."
+  - observable_id: O09
+    feature_id: north_south_external_egress
+    roles: [training_core, training_support, discrepancy]
+    used_by_rules: [collective_cadence_training, checkpoint_training_signature, sustained_ml_compute_nonserving, achieved_ops_training_candidate, storage_staging_support, serving_heavy_network_counterevidence, activity_nonserving_candidate, serving_suppression]
+    notes: "Dataset/artifact movement support or serving counterevidence depending on shape."
+  - observable_id: O09
+    feature_id: data_center_interconnect_wan_usage
+    roles: [training_support, discrepancy]
+    used_by_rules: [storage_staging_support, internal_data_movement_support, storage_rebuild_backup_explanation, high_fabric_activity_storage_or_backup_explanation]
+    notes: "Weak training support; often replication, migration, backup, or export."
+  - observable_id: O09
+    feature_id: load_balancer_gateway_flow_activity
+    roles: [training_core, training_support, discrepancy]
+    used_by_rules: [collective_cadence_training, checkpoint_training_signature, sustained_ml_compute_nonserving, achieved_ops_training_candidate, serving_heavy_network_counterevidence, hpc_mpi_collective_alternative, activity_nonserving_candidate, serving_suppression]
+    notes: "Core serving counterevidence for non-serving compute classification."
+  - observable_id: O09
+    feature_id: network_gateway_nat_route_state
+    roles: [discrepancy]
+    used_by_rules: [route_or_topology_change_during_candidate_window]
+    notes: "Splits flow visibility and path interpretation."
+
+  - observable_id: O10
+    feature_id: storage_read_operation_bytes
+    roles: [training_support, discrepancy]
+    used_by_rules: [storage_staging_support, memory_bandwidth_activity_support, serving_heavy_network_counterevidence, high_fabric_activity_storage_or_backup_explanation, storage_rebuild_backup_explanation]
+    notes: "Dataset staging support only when aligned with core evidence."
+  - observable_id: O10
+    feature_id: storage_write_operation_bytes
+    roles: [training_core, training_support, discrepancy]
+    used_by_rules: [collective_cadence_training, checkpoint_training_signature, achieved_ops_training_candidate, storage_staging_support, storage_rebuild_backup_explanation, checkpoint_writes_no_accelerator_activity, high_fabric_activity_storage_or_backup_explanation, activity_checkpoint_candidate, allocated_activity_checkpoint_training_candidate, ops_checkpoint_training_candidate, storage_operation_suppression]
+    notes: "Checkpoint-like activity when periodic and aligned with accelerator work."
+  - observable_id: O10
+    feature_id: filesystem_throughput_metadata_ops
+    roles: [training_core, training_support, discrepancy]
+    used_by_rules: [collective_cadence_training, checkpoint_training_signature, achieved_ops_training_candidate, cache_epoch_support, storage_rebuild_backup_explanation, high_fabric_activity_storage_or_backup_explanation, activity_checkpoint_candidate, ops_checkpoint_training_candidate, storage_operation_suppression]
+    notes: "Supports data-load and checkpoint phases; shared filesystems create false positives."
+  - observable_id: O10
+    feature_id: cache_hit_miss_counters
+    roles: [training_support, discrepancy]
+    used_by_rules: [cache_epoch_support, storage_staging_support, memory_bandwidth_activity_support]
+    notes: "Weak epoch/cache context and bottleneck explanation."
+  - observable_id: O10
+    feature_id: object_storage_operation_counts
+    roles: [training_core, training_support, discrepancy]
+    used_by_rules: [collective_cadence_training, checkpoint_training_signature, achieved_ops_training_candidate, storage_staging_support, storage_rebuild_backup_explanation, checkpoint_writes_no_accelerator_activity, activity_checkpoint_candidate, allocated_activity_checkpoint_training_candidate, ops_checkpoint_training_candidate, storage_operation_suppression]
+    notes: "Separates read shards, checkpoint writes, logs, and exports when object metadata is available."
+  - observable_id: O10
+    feature_id: storage_operation_intervals
+    roles: [training_support, discrepancy]
+    used_by_rules: [storage_staging_support, internal_data_movement_support, storage_rebuild_backup_explanation, checkpoint_writes_no_accelerator_activity, high_fabric_activity_storage_or_backup_explanation, storage_operation_suppression]
+    notes: "Explicit backup/restore/rebuild/migration explanation channel."
+  - observable_id: O10
+    feature_id: object_or_file_copy_movement_records
+    roles: [training_support, discrepancy]
+    used_by_rules: [storage_staging_support, internal_data_movement_support, storage_rebuild_backup_explanation, checkpoint_writes_no_accelerator_activity, high_fabric_activity_storage_or_backup_explanation, storage_operation_suppression]
+    notes: "Copy-in/copy-out support or storage-movement false-positive explanation."
+
+  - observable_id: O11
+    feature_id: accelerator_device_power_energy
+    roles: [capacity, training_support, discrepancy]
+    used_by_rules: [power_thermal_physical_support, high_power_low_gpu_activity, checkpoint_writes_no_accelerator_activity, telemetry_gap_during_candidate_training_window]
+    notes: "Physical activity support and cross-check; not workload identity."
+  - observable_id: O11
+    feature_id: server_system_input_power
+    roles: [training_support, discrepancy]
+    used_by_rules: [power_thermal_physical_support, high_power_low_gpu_activity, power_cooling_physical_mismatch]
+    notes: "Server-level physical load cross-check."
+  - observable_id: O11
+    feature_id: rack_pdu_it_power
+    roles: [capacity, training_support, discrepancy]
+    used_by_rules: [power_thermal_physical_support, high_power_low_gpu_activity, activity_before_installation_or_electrical_service, telemetry_gap_during_candidate_training_window, power_cooling_physical_mismatch]
+    notes: "Rack-scale physical consistency signal and coarse capacity support."
+  - observable_id: O11
+    feature_id: facility_or_room_it_power_rollup
+    roles: [capacity, training_support, discrepancy]
+    used_by_rules: [power_thermal_physical_support, high_power_low_gpu_activity, activity_before_installation_or_electrical_service, power_cooling_physical_mismatch, cap_electrical_installation_timeline]
+    notes: "Coarse physical plausibility; requires monitored-scope isolation."
+  - observable_id: O11
+    feature_id: power_cap_violation_throttle_state
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_power_clock_limit_adjustment, high_activity_during_health_or_throttle_degraded_state]
+    notes: "Explains throttling and caps credible high-throughput claims."
+
+  - observable_id: O12
+    feature_id: inlet_outlet_air_or_coolant_temperature
+    roles: [training_support, discrepancy]
+    used_by_rules: [cap_power_clock_limit_adjustment, power_thermal_physical_support, power_cooling_physical_mismatch]
+    notes: "Lagged heat-removal consistency signal."
+  - observable_id: O12
+    feature_id: coolant_flow_rate
+    roles: [training_support, discrepancy]
+    used_by_rules: [power_thermal_physical_support, power_cooling_physical_mismatch]
+    notes: "Cooling response and fault explanation."
+  - observable_id: O12
+    feature_id: coolant_pressure
+    roles: [training_support, discrepancy]
+    used_by_rules: [power_thermal_physical_support, power_cooling_physical_mismatch]
+    notes: "Cooling state context, not workload identity."
+  - observable_id: O12
+    feature_id: pump_speed_or_state
+    roles: [training_support, discrepancy]
+    used_by_rules: [power_thermal_physical_support, power_cooling_physical_mismatch]
+    notes: "Cooling control response and physical consistency."
+  - observable_id: O12
+    feature_id: valve_position_or_state
+    roles: [training_support, discrepancy]
+    used_by_rules: [power_thermal_physical_support, power_cooling_physical_mismatch]
+    notes: "Explains flow and temperature changes."
+  - observable_id: O12
+    feature_id: cooling_alarm_state
+    roles: [training_support, discrepancy]
+    used_by_rules: [cap_power_clock_limit_adjustment, power_thermal_physical_support, high_power_low_gpu_activity, power_cooling_physical_mismatch]
+    notes: "Benign explanation for throttles, gaps, and physical anomalies."
+  - observable_id: O12
+    feature_id: fan_speed_rpm_or_percent
+    roles: [training_support, discrepancy]
+    used_by_rules: [power_thermal_physical_support, power_cooling_physical_mismatch]
+    notes: "Air-cooled heat-load support and consistency check."
+  - observable_id: O12
+    feature_id: airflow_rate
+    roles: [training_support, discrepancy]
+    used_by_rules: [power_thermal_physical_support, power_cooling_physical_mismatch]
+    notes: "Physical plausibility support when mapped to heat load."
+  - observable_id: O12
+    feature_id: thermal_control_mode
+    roles: [discrepancy]
+    used_by_rules: [power_thermal_physical_support, power_cooling_physical_mismatch]
+    notes: "Splits interpretation of fan, flow, and temperature response."
+  - observable_id: O12
+    feature_id: source_reported_airflow_state
+    roles: [discrepancy]
+    used_by_rules: [power_thermal_physical_support, power_cooling_physical_mismatch]
+    notes: "Categorical airflow context for physical anomalies."
+  - observable_id: O12
+    feature_id: outdoor_air_temperature_celsius
+    roles: [discrepancy]
+    used_by_rules: [power_thermal_physical_support, power_cooling_physical_mismatch]
+    notes: "Ambient normalization for facility/cooling response."
+  - observable_id: O12
+    feature_id: outdoor_humidity_percent
+    roles: [discrepancy]
+    used_by_rules: [power_thermal_physical_support, power_cooling_physical_mismatch]
+    notes: "Humidity normalization for economizer or evaporative cooling behavior."
+  - observable_id: O12
+    feature_id: hvac_control_mode
+    roles: [discrepancy]
+    used_by_rules: [power_thermal_physical_support, power_cooling_physical_mismatch]
+    notes: "Facility control-mode context."
+  - observable_id: O12
+    feature_id: economizer_state
+    roles: [discrepancy]
+    used_by_rules: [power_thermal_physical_support, power_cooling_physical_mismatch]
+    notes: "Cooling-power baseline normalization."
+  - observable_id: O12
+    feature_id: facility_temperature_setpoint_celsius
+    roles: [discrepancy]
+    used_by_rules: [power_thermal_physical_support, power_cooling_physical_mismatch]
+    notes: "Setpoint changes explain thermal and cooling shifts."
+
+  - observable_id: O13
+    feature_id: container_resource_request_quantity
+    roles: [capacity, training_support, discrepancy]
+    used_by_rules: [cap_partition_adjustment, cap_cloud_capacity_constraint, partition_shape_context]
+    notes: "Intended resource shape and partition/request context."
+  - observable_id: O13
+    feature_id: container_resource_limit_quantity
+    roles: [capacity, training_support, discrepancy]
+    used_by_rules: [cap_partition_adjustment, cap_cloud_capacity_constraint, partition_shape_context]
+    notes: "Container-level bound where limits are enforceable."
+  - observable_id: O13
+    feature_id: container_resource_usage_quantity
+    roles: [training_core, training_support, discrepancy]
+    used_by_rules: [collective_cadence_training, checkpoint_training_signature, sustained_ml_compute_nonserving, achieved_ops_training_candidate, high_gpu_activity_no_allocation, high_fabric_activity_no_job_mapping, lifecycle_preemption_context, serving_heavy_network_counterevidence]
+    notes: "Core contextual activity feature for separating data-load, serving, and training phases."
+  - observable_id: O13
+    feature_id: resource_container_lifecycle_events
+    roles: [training_support, discrepancy]
+    used_by_rules: [lifecycle_preemption_context, high_gpu_activity_no_allocation]
+    notes: "Bounds starts, restarts, failures, and lifecycle-related gaps."
+
+  - observable_id: O14
+    feature_id: maintenance_operation_intervals
+    roles: [capacity, training_support, discrepancy]
+    used_by_rules: [cap_capacity_upper_bound_flop, cap_health_degraded_device_adjustment, cap_topology_domain_constraint, cap_electrical_installation_timeline, lifecycle_preemption_context, high_power_low_gpu_activity, high_gpu_activity_no_allocation, telemetry_gap_during_candidate_training_window, route_or_topology_change_during_candidate_window, physical_access_near_telemetry_or_inventory_gap]
+    notes: "Capacity reducer and benign explanation for gaps, topology changes, and storage/network movement."
+  - observable_id: O14
+    feature_id: physical_access_events
+    roles: [discrepancy]
+    used_by_rules: [telemetry_gap_during_candidate_training_window, physical_access_near_telemetry_or_inventory_gap]
+    notes: "Provenance/integrity context around swaps, gaps, and topology changes."
+
+  - observable_id: O15
+    feature_id: utility_interconnection_status_intervals
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_electrical_installation_timeline, activity_before_installation_or_electrical_service]
+    notes: "Site-level power timeline and capacity plausibility."
+  - observable_id: O15
+    feature_id: electrical_service_status_intervals
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_electrical_installation_timeline, activity_before_installation_or_electrical_service]
+    notes: "Energization and service capacity bound physical feasibility."
+  - observable_id: O15
+    feature_id: electrical_permit_status_intervals
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_electrical_installation_timeline, activity_before_installation_or_electrical_service]
+    notes: "Weaker capacity timeline support than actual service or power readings."
+  - observable_id: O15
+    feature_id: asset_receiving_installation_events
+    roles: [capacity, discrepancy]
+    used_by_rules: [cap_electrical_installation_timeline, activity_before_installation_or_electrical_service, physical_access_near_telemetry_or_inventory_gap]
+    notes: "Earliest plausible asset availability and commissioning timeline."

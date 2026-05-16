@@ -1,0 +1,197 @@
+source_registry_id: observables_source_registry
+version: "2026-05-15"
+purpose: >
+  Sources for measurement-surface existence and caveats in the independent
+  observables taxonomy. These sources support that infrastructure records or
+  metrics can exist and describe the measurement surfaces referenced by the
+  taxonomy.
+
+source_policy:
+  supports_observable_surface_existence: true
+  positive_observable_surfaces_only: true
+  official_docs_preferred: true
+  direct_infrastructure_fields_only: true
+
+sources:
+  - id: nvidia_dcgm_exporter
+    title: NVIDIA DCGM Exporter
+    url: "https://docs.nvidia.com/datacenter/dcgm/latest/gpu-telemetry/dcgm-exporter.html"
+    supports:
+      - GPU metrics exposed to Prometheus, including clocks, temperatures, power, energy, memory, PCIe/NVLink, and profiling counters.
+      - MIG-aware metric publication and exporter interval/configuration surfaces.
+
+  - id: nvidia_smi
+    title: NVIDIA System Management Interface
+    url: "https://docs.nvidia.com/deploy/nvidia-smi/"
+    supports:
+      - GPU inventory, utilization, memory, clocks, power, temperature, ECC, retired pages, accounting counters, and MIG state.
+    caveat: "Use only device inventory, resource, and telemetry fields referenced by the taxonomy."
+
+  - id: nvidia_ufm_telemetry
+    title: NVIDIA UFM Telemetry
+    url: "https://docs.nvidia.com/networking/display/ufmsdnappumv4160/telemetry"
+    supports:
+      - InfiniBand fabric telemetry, bandwidth, congestion, errors, latency, XmitWait, and port-based monitoring.
+
+  - id: nvidia_ufm_port_counters
+    title: NVIDIA UFM supported port counters
+    url: "https://docs.nvidia.com/networking/display/ufmsdnappumv41814/Appendix+-+Supported+Port+Counters+and+Events"
+    supports:
+      - Port transmit/receive counters, errors, congestion, and fabric events.
+
+  - id: amd_smi
+    title: AMD System Management Interface
+    url: "https://rocm.docs.amd.com/projects/amdsmi/en/latest/index.html"
+    supports:
+      - AMD GPU monitoring and management interfaces for inventory, utilization, memory, clocks, power, temperature, and device state.
+
+  - id: google_tpu_monitoring
+    title: Cloud TPU monitoring
+    url: "https://cloud.google.com/tpu/docs/tpu-monitoring-library"
+    supports:
+      - TPU TensorCore utilization, duty cycle, memory, and TPU monitoring library metrics.
+
+  - id: aws_neuron_container_insights
+    title: AWS Container Insights accelerated-computing metrics
+    url: "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Container-Insights-metrics-enhanced-EKS.html"
+    supports:
+      - EKS and Kubernetes infrastructure metrics, including GPU, AWS Neuron, EFA, pod, node, network, and storage-related metrics.
+    caveat: "Use resource, device, node, pod, and container metrics referenced by the taxonomy."
+
+  - id: slurm_sacct
+    title: Slurm sacct
+    url: "https://slurm.schedmd.com/sacct.html"
+    supports:
+      - Resource accounting records for states, elapsed time, allocations, nodes, TRES, energy, and selected I/O fields.
+    caveat: "Use only non-semantic resource, timing, state, and count fields."
+
+  - id: slurm_gres
+    title: Slurm GRES
+    url: "https://slurm.schedmd.com/gres.html"
+    supports:
+      - GPU generic resources, typed GPU resources, NVML autodetection, MIG, MPS, and GPU accounting configuration.
+
+  - id: kubernetes_device_plugins
+    title: Kubernetes device plugins
+    url: "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/"
+    supports:
+      - Vendor device discovery and extended resource allocation for pods.
+
+  - id: kubernetes_audit
+    title: Kubernetes auditing
+    url: "https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/"
+    supports:
+      - Chronological resource lifecycle records according to a configured audit policy.
+    caveat: "Use only resource allocation, lifecycle timing, and state fields referenced by the taxonomy."
+
+  - id: kubernetes_events
+    title: Kubernetes Events API
+    url: "https://kubernetes.io/docs/reference/kubernetes-api/cluster-resources/event-v1/"
+    supports:
+      - Resource lifecycle events, involved object classes, reasons, timestamps, and reporting components.
+    caveat: "Use only lifecycle timing, state, and count fields referenced by the taxonomy."
+
+  - id: aws_cloudtrail
+    title: AWS CloudTrail concepts
+    url: "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-concepts.html"
+    supports:
+      - Infrastructure management, data, and network activity events for time/resource records and log classes.
+    caveat: "Use compute, storage, network, billing, and reservation lifecycle fields referenced by the taxonomy."
+
+  - id: aws_cur
+    title: AWS Cost and Usage Reports
+    url: "https://docs.aws.amazon.com/cur/latest/userguide/what-is-cur.html"
+    supports:
+      - Cost and usage line items, usage type, product, operation, time, and resource fields where enabled.
+    caveat: "Use accelerator compute or reservation usage quantities, units, time windows, and shape/SKU fields referenced by the taxonomy."
+
+  - id: aws_ec2_capacity_blocks
+    title: AWS EC2 Capacity Blocks
+    url: "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-capacity-blocks.html"
+    supports:
+      - GPU capacity reservation size, duration, start time, instance type, and reservation concepts.
+
+  - id: aws_efa
+    title: AWS Elastic Fabric Adapter
+    url: "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html"
+    supports:
+      - Low-latency, high-throughput network interface and provider-side fabric capability records.
+
+  - id: aws_vpc_flow_logs
+    title: AWS VPC Flow Logs
+    url: "https://docs.aws.amazon.com/vpc/latest/userguide/flow-log-records.html"
+    supports:
+      - VPC flow-log record fields, aggregation intervals, delivery caveats, skipped data states, and network-interface flow values.
+
+  - id: aws_s3_server_access_logs
+    title: Amazon S3 server access logging
+    url: "https://docs.aws.amazon.com/AmazonS3/latest/userguide/ServerLogs.html"
+    supports:
+      - Storage access logs, request timing, operation, bytes, and best-effort delivery caveats.
+    caveat: "Use storage timing, operation, and byte fields referenced by the taxonomy."
+
+  - id: aws_fsx_lustre_metrics
+    title: Amazon FSx for Lustre metrics
+    url: "https://docs.aws.amazon.com/fsx/latest/LustreGuide/fs-metrics.html"
+    supports:
+      - Filesystem throughput, I/O, metadata, storage, and client-facing performance metrics.
+
+  - id: google_cloud_audit_logs
+    title: Google Cloud Audit Logs
+    url: "https://cloud.google.com/logging/docs/audit"
+    supports:
+      - Admin Activity, Data Access, Policy Denied, and System Event audit logs with resource/time fields.
+    caveat: "Use infrastructure lifecycle/resource fields referenced by the taxonomy."
+
+  - id: google_vpc_flow_logs
+    title: Google Cloud VPC Flow Logs
+    url: "https://cloud.google.com/vpc/docs/flow-logs"
+    supports:
+      - Sampled and aggregated VPC flow records, RDMA flow caveats, metadata annotations, filtering, and aggregation intervals.
+
+  - id: google_cloud_billing_export
+    title: Google Cloud detailed billing export
+    url: "https://cloud.google.com/billing/docs/how-to/export-data-bigquery-tables/detailed-usage"
+    supports:
+      - Detailed billing and usage export for resource, project, service, SKU, cost, and usage analysis.
+    caveat: "Use accelerator compute or reservation usage quantities, units, time windows, and shape/SKU fields referenced by the taxonomy."
+
+  - id: google_compute_gpu_monitoring
+    title: Google Compute Engine GPU monitoring
+    url: "https://cloud.google.com/compute/docs/gpus/monitor-gpus"
+    supports:
+      - GPU utilization and GPU metrics collection on Google Compute Engine VMs.
+
+  - id: azure_monitor_vm
+    title: Azure Monitor for virtual machines
+    url: "https://learn.microsoft.com/en-us/azure/azure-monitor/vm/monitor-virtual-machine"
+    supports:
+      - VM performance and Azure Monitor collection concepts.
+    caveat: "Use infrastructure performance/resource fields referenced by the taxonomy."
+
+  - id: azure_nsg_flow_logs
+    title: Azure NSG Flow Logs
+    url: "https://learn.microsoft.com/en-us/azure/network-watcher/nsg-flow-logs-overview"
+    supports:
+      - IP flow logs for network security groups, 1-minute collection, JSON records, inbound/outbound flows, and storage/export paths.
+
+  - id: redfish_standard
+    title: DMTF Redfish
+    url: "https://www.dmtf.org/standards/redfish"
+    supports:
+      - Standard management model for servers, power, thermal, telemetry, firmware, logs, fabrics, storage, liquid cooling, and power distribution.
+    caveat: "Use infrastructure activity, device state, power, thermal, cooling, maintenance, and physical state fields referenced by the taxonomy."
+
+  - id: redfish_schema_guide
+    title: Redfish Resource and Schema Guide
+    url: "https://redfish.dmtf.org/schemas/DSP2046_2025.2.html"
+    supports:
+      - Resource schemas for system, chassis, power, thermal, log, firmware, and physical-management records.
+    caveat: "Use infrastructure activity, device state, power, thermal, cooling, maintenance, and physical state fields referenced by the taxonomy."
+
+  - id: epoch_frontier_datacenters
+    title: Epoch AI data centers dataset
+    url: "https://epoch.ai/data/data-centers"
+    supports:
+      - Public site-specific datacenter capacity discovery, power records, public permits, and utility context.
+    caveat: "Use only concrete site-specific utility, electrical, and asset timing values referenced by the taxonomy."

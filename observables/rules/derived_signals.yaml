@@ -1,0 +1,957 @@
+schema_version: "0.2"
+created: "2026-05-16"
+source_inventory: observables/observables.yaml
+status: concrete_algorithm_signal_spec
+
+derived_signal_conventions:
+  score_range: score_0_to_1
+  time_alignment: >
+    Convert samples, intervals, and events to aligned half-open intervals
+    `[start_time, end_time)`. Split every computation window at source sample
+    boundaries, interval boundaries, topology/routing changes, lifecycle
+    events, and known clock-drift correction points.
+  coverage_definition: >
+    `coverage_fraction = observed_valid_seconds / expected_seconds` after
+    excluding documented maintenance, source-disabled, or out-of-scope periods.
+  missing_data_policy: >
+    Missing primary activity, allocation, fabric, storage, or serving channels
+    must reduce confidence or produce an explicit missingness output. Missing
+    data must not be interpreted as absence unless the channel's expected
+    coverage is established for the same scope and window.
+  normalization_policy: >
+    Prefer fractions of source-reported capacity, per-participant rates,
+    per-cadence-period volumes, overlap fractions, and local-baseline
+    percentiles. Raw byte or power thresholds are not portable and must be
+    converted to normalized scores before use by training rules.
+
+derived_signals:
+  - id: capacity_upper_bound_flop
+    input_features:
+      - accelerator_count_by_family_sku
+      - advertised_peak_rate_by_precision
+      - accelerator_partitioning_intervals
+      - accelerator_power_cap_watts
+      - accelerator_core_clock_hz
+      - accelerator_memory_clock_hz
+      - accelerator_p_state
+      - accelerator_throttle_state
+      - accelerator_performance_limit_state
+      - accelerator_health_error_state
+      - instance_type_shape_machine_type
+      - compute_running_intervals
+      - capacity_reservation_intervals
+      - quota_limit_intervals
+      - accelerator_compute_billing_usage_intervals
+      - maintenance_operation_intervals
+      - utility_interconnection_status_intervals
+      - electrical_service_status_intervals
+      - asset_receiving_installation_events
+    input_windows: "Clock-aligned capacity validity segments split at inventory, shape, cap, clock, health, service, maintenance, quota, reservation, and running-state boundaries."
+    output_type: object
+    output_fields:
+      - operation_count
+      - precision_or_mode
+      - start_time
+      - end_time
+      - limiting_features
+      - coverage_fraction
+      - unavailable_fraction
+      - cap_clock_power_factor
+      - capacity_upper_bound_operations
+      - uncertainty_margin
+    output_unit: operations
+    normalization: "Operations per segment are summed over SKU and normalized only by the window duration already represented in the integral."
+    formula: |
+      For each aligned segment s:
+        segment_seconds = s.end_time - s.start_time
+        capacity_ops_s = segment_seconds *
+          sum over sku, precision_or_mode:
+            count_sku(s) *
+            peak_rate_ops_per_second_sku_precision(s) *
+            available_accelerator_fraction_sku(s) *
+            cap_clock_power_factor_sku(s) *
+            topology_domain_factor_sku(s)
+      capacity_upper_bound_operations = sum_s capacity_ops_s
+      If enforced quota/running/billing constraints are in scope, cap the
+      segment count or accelerator-hours before multiplication.
+    missing_data_behavior:
+      - "Missing source-backed peak rate prevents a numeric upper bound for that SKU/mode."
+      - "Missing cap, clock, or throttle data defaults to factor 1.0 for conservative upper-bound calculations, but the missing channel is recorded."
+      - "Missing installation or electrical-service data prevents strong negative certification for physical sites."
+    minimum_coverage_requirement:
+      feature: telemetry_coverage_fraction.primary_channel_min
+      value: 0.90
+      unit: fraction
+      evidence_status: calibration_default
+      rationale: "Negative capacity or no-run claims need high coverage of inventory, service, and capability inputs."
+      calibration_note: "Replace with source-specific inventory and service-record completeness."
+    default_parameters:
+      - name: unknown_cap_clock_power_factor_for_upper_bound
+        value: 1.0
+        unit: fraction
+        evidence_status: mechanism_inferred
+        source_refs: [S04, S05, S06, S07, S08, S09, S24]
+        rationale: "For upper bounds, unknown caps should not reduce capacity unless a source says they were active."
+        counterevidence_or_failure_modes: ["using 1.0 can overstate capacity when undocumented caps existed"]
+        calibration_note: "Replace with measured cap/clock coverage and site default cap settings."
+      - name: default_uncertainty_margin
+        value: 0.10
+        unit: ratio
+        evidence_status: calibration_default
+        source_refs: [S04, S05, S06, S07, S08, S09, S24]
+        rationale: "Executable margin for unit and aggregation uncertainty in capacity comparisons."
+        counterevidence_or_failure_modes: ["operation-unit mismatch can exceed this margin", "hidden capacity invalidates monitored-scope comparison"]
+        calibration_note: "Replace with an uncertainty model for each source and precision/mode."
+    known_false_positives_or_limits:
+      - "Advertised peak is an upper bound and does not prove achieved training activity."
+      - "Capacity above a policy threshold only means a threshold-scale run was possible."
+      - "Cloud quota, reservation, and billing records may use provider-specific aggregation and scope."
+    used_by_rules:
+      - cap_capacity_upper_bound_flop
+      - cap_negative_certification_inputs
+      - claimed_compute_above_cap_adjusted_capacity
+      - achieved_ops_training_candidate
+      - activity_before_installation_or_electrical_service
+    source_refs: [S01, S03, S04, S05, S06, S07, S08, S09, S23, S24, S26, S35, S40, S41]
+
+  - id: cap_clock_power_factor
+    input_features:
+      - accelerator_power_cap_watts
+      - accelerator_core_clock_hz
+      - accelerator_memory_clock_hz
+      - accelerator_p_state
+      - accelerator_throttle_state
+      - accelerator_performance_limit_state
+      - accelerator_power_limit_active
+      - accelerator_thermal_limit_active
+      - power_cap_violation_throttle_state
+    input_windows: "Per-device or per-SKU sample intervals overlapping the capacity/activity window."
+    output_type: object
+    output_fields:
+      - cap_clock_power_factor
+      - clock_factor
+      - power_cap_factor
+      - active_limit_factor
+      - affected_fraction
+      - coverage_fraction
+      - limiting_state
+    output_unit: fraction
+    score_range: [0.0, 1.0]
+    normalization: "Each factor is normalized to the source-reported reference clock, power limit, or site-calibrated maximum for the same SKU."
+    formula: |
+      clock_factor = min(1, observed_core_clock_hz / reference_core_clock_hz)
+      memory_clock_factor = min(1, observed_memory_clock_hz / reference_memory_clock_hz) when memory-bound mode is in scope, else 1
+      power_cap_factor = min(1, configured_power_cap_watts / reference_power_limit_watts)
+      active_limit_factor = min(active limit default factors observed in the segment, 1)
+      cap_clock_power_factor = clamp(min(clock_factor, memory_clock_factor,
+        power_cap_factor, active_limit_factor), 0, 1)
+    missing_data_behavior:
+      - "For upper-bound capacity, missing factors default to 1.0 and are reported as missing."
+      - "For discrepancy checks, missing factors lower confidence rather than clearing a conflict."
+    minimum_coverage_requirement:
+      value: 0.80
+      unit: fraction
+      evidence_status: calibration_default
+      rationale: "Most limit-state samples must be present before using the factor as an activity contradiction."
+      calibration_note: "Calibrate by device telemetry scrape interval and DCIM/BMC source reliability."
+    default_parameters:
+      - name: active_power_limit_factor
+        value: 0.80
+        unit: fraction
+        evidence_status: calibration_default
+        source_refs: [S07, S08, S09]
+        rationale: "Executable default for sustained active power limits before site power-performance curves are available."
+        counterevidence_or_failure_modes: ["some power limits are non-binding", "severe caps can reduce throughput more than this"]
+        calibration_note: "Replace with per-SKU measured power/performance curves."
+      - name: active_thermal_or_throttle_factor
+        value: 0.70
+        unit: fraction
+        evidence_status: calibration_default
+        source_refs: [S07, S08, S09, S40, S41]
+        rationale: "Executable default when active throttle/thermal limit states are sustained."
+        counterevidence_or_failure_modes: ["transient throttle events may not affect window throughput", "persistent throttling can be worse"]
+        calibration_note: "Replace with site telemetry relating limit-state duration to achieved rate."
+    known_false_positives_or_limits:
+      - "Power/clock caps are hardware constraints, not workload identity."
+      - "P-state and throttle semantics vary by vendor and driver."
+    used_by_rules:
+      - cap_power_clock_limit_adjustment
+      - cap_capacity_upper_bound_flop
+      - high_activity_during_health_or_throttle_degraded_state
+      - power_thermal_physical_support
+    source_refs: [S07, S08, S09, S40, S41]
+
+  - id: available_accelerator_fraction
+    input_features:
+      - accelerator_count_by_family_sku
+      - accelerator_partitioning_intervals
+      - accelerator_health_error_state
+      - inventory_lifecycle_events
+      - reservation_state_intervals
+      - capacity_reservation_intervals
+      - compute_running_intervals
+      - maintenance_operation_intervals
+      - asset_receiving_installation_events
+    input_windows: "Inventory, partition, health, maintenance, reservation, running, and commissioning validity intervals for the same monitored scope."
+    output_type: object
+    output_fields:
+      - available_accelerator_fraction
+      - installed_count
+      - available_count
+      - partition_compute_fraction
+      - health_unavailable_count
+      - maintenance_unavailable_count
+      - coverage_fraction
+    output_unit: fraction
+    score_range: [0.0, 1.0]
+    normalization: "available_count / installed_or_provider_shape_count for the same SKU, partition scope, and window."
+    formula: |
+      available_count = installed_count
+        - unavailable_from_health_or_error_state
+        - unavailable_from_maintenance
+        - unavailable_from_uncommissioned_assets
+        - unavailable_from_out_of_scope_reservation_or_running_state
+      For partitions, multiply each physical device by partition_compute_fraction
+      before summing when the audit hypothesis requires full-device training.
+      available_accelerator_fraction = clamp(available_count / installed_count, 0, 1)
+    missing_data_behavior:
+      - "Missing partition data defaults to full-device availability for conservative upper bounds, and is marked unavailable for strong negative certification."
+      - "Missing health data does not subtract devices unless another source indicates maintenance or degraded service."
+    minimum_coverage_requirement:
+      value: 0.90
+      unit: fraction
+      evidence_status: calibration_default
+      rationale: "Capacity bounds need high inventory and availability coverage."
+      calibration_note: "Replace with inventory, scheduler, and maintenance source completeness."
+    default_parameters:
+      - name: full_device_partition_compute_fraction
+        value: 1.0
+        unit: fraction
+        evidence_status: source_informed
+        source_refs: [S10, S19, S20]
+        rationale: "A full-device allocation exposes the full logical accelerator for capacity calculations."
+        counterevidence_or_failure_modes: ["driver-level caps or sharing may still reduce usable capacity"]
+        calibration_note: "Use source-reported partition profile mapping for each accelerator family."
+      - name: unknown_shared_partition_compute_fraction
+        value: 0.50
+        unit: fraction
+        evidence_status: calibration_default
+        source_refs: [S10, S19, S20]
+        rationale: "Executable fallback for unknown shared partitions; conservative for single-run feasibility, not for total capacity."
+        counterevidence_or_failure_modes: ["actual slice may be much smaller or larger"]
+        calibration_note: "Replace with MIG/vGPU/device-plugin profile lookup."
+    known_false_positives_or_limits:
+      - "Reservations indicate availability, not activity."
+      - "Logical partition count may not map linearly to training throughput."
+    used_by_rules:
+      - cap_partition_adjustment
+      - cap_health_degraded_device_adjustment
+      - cap_capacity_upper_bound_flop
+      - high_activity_during_health_or_throttle_degraded_state
+      - activity_before_installation_or_electrical_service
+    source_refs: [S10, S18, S19, S20, S23]
+
+  - id: largest_usable_topology_domain
+    input_features:
+      - local_accelerator_interconnect_domain
+      - scaleout_fabric_domain_graph
+      - cross_site_or_dci_connectivity
+      - topology_change_events
+      - local_link_error_recovery_throttle
+      - rdma_congestion_retry_drop_error_counters
+      - fabric_port_device_sample_counters
+      - maintenance_operation_intervals
+    input_windows: "Topology validity windows split at topology changes, link errors, route changes, congestion states, and maintenance intervals."
+    output_type: object
+    output_fields:
+      - domain_accelerator_count
+      - domain_node_count
+      - fabric_class
+      - effective_bisection_bandwidth_gbps
+      - topology_support_score
+      - removed_links_or_nodes
+      - limiting_events
+      - coverage_fraction
+    output_unit: mixed_object
+    normalization: "Bandwidth is normalized to per-participant and effective bisection capacity for the active domain."
+    formula: |
+      Build graph G(active nodes, active links) for each aligned topology window.
+      Remove nodes/links in maintenance, failed, administratively down, or
+      persistent degraded states. Compute connected components and choose the
+      largest low-latency component. Estimate effective_bisection_bandwidth_gbps
+      from active link bandwidths after removing degraded links. Score:
+        topology_support_score = clamp(0.45 * domain_size_score +
+          0.35 * fabric_health_score + 0.20 * mapping_coverage, 0, 1)
+    missing_data_behavior:
+      - "Missing link health preserves links for upper-bound capacity but lowers topology_support_score."
+      - "Unknown WAN/DCI semantics are not treated as low-latency synchronous training fabric."
+    minimum_coverage_requirement:
+      value: 0.80
+      unit: fraction
+      evidence_status: source_informed
+      rationale: "Fabric topology must cover most of the candidate window before supporting training context."
+      calibration_note: "Calibrate by fabric telemetry and topology inventory coverage."
+    known_false_positives_or_limits:
+      - "A coherent low-latency domain supports possibility, not workload identity."
+      - "HPC and benchmark jobs also prefer coherent low-latency domains."
+    used_by_rules:
+      - cap_topology_domain_constraint
+      - collective_cadence_training
+      - topology_training_context
+      - route_or_topology_change_during_candidate_window
+    source_refs: [S11, S15, S16, S17, S25, S42, S43]
+
+  - id: stable_participant_set
+    input_features:
+      - allocated_accelerator_count_by_sku
+      - compute_running_intervals
+      - container_resource_usage_quantity
+      - scaleout_port_tx_rx_bytes_packets
+      - local_interconnect_tx_rx_bytes
+      - fabric_port_device_sample_counters
+    input_windows: "Allocation/running, container, and fabric-port windows aligned to the same job/account/container/topology scope."
+    output_type: object
+    output_fields:
+      - participant_count
+      - participant_scope
+      - start_time
+      - end_time
+      - duration_seconds
+      - churn_fraction
+      - active_participant_presence_fraction
+      - mapping_coverage_fraction
+      - stability_score
+    output_unit: mixed_object
+    score_range: [0.0, 1.0]
+    normalization: "Participant counts use median active participants in the aligned window; churn is joins plus leaves divided by median active participants."
+    formula: |
+      participant_count = median count of active participants over covered samples
+      churn_fraction = (joins + leaves) / max(participant_count, 1)
+      active_participant_presence_fraction =
+        mean over participants of covered_active_seconds / window_seconds
+      mapping_coverage_fraction =
+        seconds with valid allocation/container/port mapping / window_seconds
+      stability_score = clamp(
+        0.45 * active_participant_presence_fraction +
+        0.35 * (1 - churn_fraction) +
+        0.20 * mapping_coverage_fraction,
+        0, 1)
+    missing_data_behavior:
+      - "Missing participant identity or port mapping lowers mapping_coverage_fraction."
+      - "Unmapped fabric activity may still form a discrepancy but cannot produce strong core training evidence."
+    minimum_coverage_requirement:
+      value: 0.80
+      unit: fraction
+      evidence_status: calibration_default
+      rationale: "Participant stability is unreliable when most allocation or mapping records are absent."
+      calibration_note: "Replace with local scheduler and fabric mapping coverage."
+    known_false_positives_or_limits:
+      - "HPC, NCCL tests, and burn-in can have very stable participant sets."
+      - "Elastic or preempted training can have lower stability."
+    used_by_rules:
+      - collective_cadence_training
+      - sustained_ml_compute_nonserving
+      - high_fabric_activity_no_job_mapping
+      - topology_training_context
+    source_refs: [S12, S13, S14, S16, S17, S18, S20, S42, S43]
+
+  - id: sustained_accelerator_activity_window
+    input_features:
+      - tensor_matrix_mxu_neuron_or_engine_active_fraction
+      - generic_achieved_operation_rate
+      - accelerator_busy_or_utilization_fraction
+      - accelerator_device_power_energy
+      - server_system_input_power
+      - rack_pdu_it_power
+    input_windows: "Per-device, per-allocation, or per-rack samples aligned to allocation/running windows and source scrape periods."
+    output_type: object
+    output_fields:
+      - start_time
+      - end_time
+      - duration_seconds
+      - activity_score
+      - normalized_intensity
+      - tensor_activity_score
+      - achieved_rate_score
+      - busy_activity_score
+      - power_support_score
+      - accelerator_hours
+      - support_channel_count
+      - source_channels
+      - coverage_fraction
+    output_unit: mixed_object
+    score_range: [0.0, 1.0]
+    normalization: "Activity channels are normalized to source-reported fraction, cap-adjusted peak rate, or baseline-subtracted power for the same scope."
+    formula: |
+      tensor_activity_score = p50(tensor_active_fraction over covered devices)
+      achieved_rate_score = p50(achieved_operation_rate / cap_adjusted_peak_rate)
+      busy_activity_score = 0.70 * p50(accelerator_busy_or_utilization_fraction)
+      power_support_score = normalized baseline-subtracted power score when mapped to devices/racks
+      activity_score = clamp(max(tensor_activity_score,
+        achieved_rate_score, busy_activity_score, power_support_score), 0, 1)
+      normalized_intensity = activity_score * coverage_fraction
+      accelerator_hours = participant_count * duration_seconds / 3600
+      support_channel_count = count of independent support channels with score >= 0.55
+    missing_data_behavior:
+      - "Prefer direct achieved-operation or tensor-active counters when present."
+      - "Power-only activity can support physical consistency but cannot produce core training identity by itself."
+      - "Missing activity channels lower coverage and can trigger telemetry-gap rules."
+    minimum_coverage_requirement:
+      value: 0.80
+      unit: fraction
+      evidence_status: source_informed
+      rationale: "Activity windows require most samples to be present."
+      calibration_note: "Set per source scrape interval and aggregation behavior."
+    known_false_positives_or_limits:
+      - "Inference, HPC, synthetic data generation, and benchmarks can have high accelerator activity."
+      - "Communication-bound or input-bound training can have lower activity scores."
+    used_by_rules:
+      - collective_cadence_training
+      - checkpoint_training_signature
+      - sustained_ml_compute_nonserving
+      - achieved_ops_training_candidate
+      - high_power_low_gpu_activity
+      - checkpoint_writes_no_accelerator_activity
+      - high_gpu_activity_no_allocation
+      - high_activity_during_health_or_throttle_degraded_state
+      - memory_bandwidth_activity_support
+    source_refs: [S07, S08, S36, S37, S38, S39]
+
+  - id: achieved_operation_integral
+    input_features:
+      - generic_achieved_operation_rate
+      - tensor_matrix_mxu_neuron_or_engine_active_fraction
+      - accelerator_busy_or_utilization_fraction
+      - advertised_peak_rate_by_precision
+      - accelerator_compute_billing_usage_intervals
+    input_windows: "Achieved-rate samples aligned to running/allocation windows and cap-adjusted capacity segments."
+    output_type: object
+    output_fields:
+      - operation_count
+      - operation_unit
+      - unit_normalized
+      - start_time
+      - end_time
+      - source_method
+      - coverage_fraction
+      - operation_count_to_capacity_upper_bound_ratio
+      - training_identity_support_score
+      - operation_unit_mismatch
+      - counter_reset_unresolved
+      - confidence
+    output_unit: operations
+    normalization: "Direct rates must be converted to FLOP-like operations for the same precision/mode before policy comparison."
+    formula: |
+      For direct counters:
+        operation_count = sum over samples and devices
+          operation_rate_ops_per_second * covered_sample_seconds
+      For calibrated proxy estimates:
+        proxy_rate = activity_fraction * conservative_sustained_rate_ops_per_second
+        operation_count = integral proxy_rate dt
+        source_method = calibrated_activity_proxy
+        confidence <= medium unless site-calibrated.
+      operation_count_to_capacity_upper_bound_ratio =
+        operation_count / max(capacity_upper_bound_operations, epsilon)
+      training_identity_support_score = max or calibrated weighted combination
+        of collective, checkpoint, non-serving, topology, and runtime/container
+        identity support scores over the same window.
+    missing_data_behavior:
+      - "Counter resets or rollovers make the segment invalid unless corrected."
+      - "Proxy estimates require calibration metadata and cannot produce strong labels."
+      - "Unnormalized units route to discrepancy review and suppress positive labels."
+    minimum_coverage_requirement:
+      value: 0.75
+      unit: fraction
+      evidence_status: source_informed
+      rationale: "Operation integrals require substantial achieved-counter or calibrated proxy coverage."
+      calibration_note: "Replace with counter-source reliability and unit-normalization tests."
+    known_false_positives_or_limits:
+      - "Large achieved compute is not workload identity."
+      - "Advertised peak must not be used as a positive lower bound unless explicitly marked as a proxy assumption."
+    used_by_rules:
+      - achieved_ops_training_candidate
+      - sustained_ml_compute_nonserving
+      - claimed_compute_above_cap_adjusted_capacity
+    source_refs: [S01, S03, S07, S08, S36, S37, S38, S39]
+
+  - id: collective_cadence_score
+    input_features:
+      - scaleout_port_tx_rx_bytes_packets
+      - local_interconnect_tx_rx_bytes
+      - fabric_port_device_sample_counters
+      - rdma_congestion_retry_drop_error_counters
+      - tensor_matrix_mxu_neuron_or_engine_active_fraction
+      - allocated_accelerator_count_by_sku
+      - compute_running_intervals
+      - storage_operation_intervals
+    input_windows: "Fabric bursts inside a stable participant set and aligned compute/allocation window."
+    output_type: object
+    output_fields:
+      - cadence_score
+      - candidate_collective_types
+      - median_period_seconds
+      - bytes_per_participant_per_period
+      - normalized_fabric_burst_score
+      - participant_synchrony_score
+      - byte_consistency_score
+      - periodicity_score
+      - compute_phase_relation_score
+      - false_positive_penalty_score
+      - storage_explanation_overlap_fraction
+    output_unit: mixed_object
+    score_range: [0.0, 1.0]
+    normalization: "Bytes are normalized per participant, per detected cadence period, and by fabric capacity for the same participant set."
+    formula: |
+      Segment fabric_active intervals from port/link counters using local
+      baseline or p90 idle-relative burst thresholds. For the stable participant set:
+        periodicity_score = clamp(1 - coefficient_of_variation(inter_burst_periods) / 0.75, 0, 1)
+        participant_synchrony_score = fraction of participants active within cadence tolerance
+        byte_consistency_score = clamp(1 - coefficient_of_variation(bytes_per_participant_per_period) / 0.75, 0, 1)
+        normalized_fabric_burst_score = clamp(
+          p50(bytes_per_participant_per_period) /
+          max(0.05 * participant_memory_capacity_bytes,
+              0.02 * per_participant_fabric_capacity_bytes_per_period,
+              site_min_training_burst_bytes_per_participant),
+          0, 1)
+        compute_phase_relation_score = fabric_compute_time_alignment.alignment_score
+        cadence_score = clamp(0.25 * periodicity_score +
+          0.25 * participant_synchrony_score +
+          0.20 * byte_consistency_score +
+          0.15 * compute_phase_relation_score +
+          0.15 * normalized_fabric_burst_score -
+          false_positive_penalty_score, 0, 1)
+    missing_data_behavior:
+      - "Without participant mapping, produce candidate fabric windows for discrepancy review only."
+      - "Without packet/message metadata, infer `collective_like_unknown` and lower confidence."
+      - "Coarse flow logs can compute overlap and burst scores but not precise collective type."
+    minimum_coverage_requirement:
+      value: 0.80
+      unit: fraction
+      evidence_status: source_informed
+      rationale: "Collective cadence requires mostly covered fabric and compute samples."
+      calibration_note: "Calibrate by fabric telemetry source, sampling interval, and aggregation."
+    default_parameters:
+      - name: cadence_tolerance_fraction_of_period
+        value: 0.20
+        unit: fraction
+        evidence_status: calibration_default
+        source_refs: [S11, S12, S13, S14, S16, S17]
+        rationale: "Executable tolerance for participant synchrony when per-step timing is not exact."
+        counterevidence_or_failure_modes: ["coarse aggregation or async collectives can require wider tolerance"]
+        calibration_note: "Tune with step-level traces from local frameworks."
+      - name: default_site_min_training_burst_bytes_per_participant
+        value: 0
+        unit: bytes
+        evidence_status: project_assumption
+        source_refs: [S11, S15, S16, S17]
+        rationale: "Default remains zero so normalized capacity/memory terms drive scoring unless the site supplies a floor."
+        counterevidence_or_failure_modes: ["zero floor can over-score tiny synchronized messages on small-memory devices"]
+        calibration_note: "Set from local model-size and fabric-burst distributions."
+    known_false_positives_or_limits:
+      - "NCCL tests, MPI/HPC workloads, and distributed inference can produce repeated collectives."
+      - "Storage traffic can appear bursty on shared fabrics if not scope-separated."
+    used_by_rules:
+      - collective_cadence_training
+      - benchmark_like_collective_counterevidence
+      - hpc_mpi_collective_alternative
+      - high_fabric_activity_no_job_mapping
+    source_refs: [S11, S12, S13, S14, S15, S16, S17, S25, S42, S43]
+
+  - id: fabric_compute_time_alignment
+    input_features:
+      - scaleout_port_tx_rx_bytes_packets
+      - local_interconnect_tx_rx_bytes
+      - tensor_matrix_mxu_neuron_or_engine_active_fraction
+      - generic_achieved_operation_rate
+      - accelerator_busy_or_utilization_fraction
+      - allocated_accelerator_count_by_sku
+      - compute_running_intervals
+    input_windows: "Fabric-active and compute-active intervals inside a shared allocation/running and participant window."
+    output_type: object
+    output_fields:
+      - overlap_fraction
+      - median_lag_seconds
+      - aligned_window
+      - alignment_score
+      - fabric_active_seconds
+      - compute_active_seconds
+      - phase_recurrence_score
+    output_unit: mixed_object
+    score_range: [0.0, 1.0]
+    normalization: "Overlap is normalized by fabric-active seconds for fabric rules and by compute-active seconds for compute-support diagnostics."
+    formula: |
+      fabric_active_seconds = seconds with normalized fabric burst score > 0
+      compute_active_seconds = seconds with activity_score > local activity floor
+      overlap_fraction = seconds(fabric_active AND compute_active) /
+        max(fabric_active_seconds, epsilon)
+      median_lag_seconds = median nearest compute-active boundary to fabric burst
+      phase_recurrence_score = fraction of repeated fabric bursts with similar
+        lag sign and magnitude within cadence tolerance
+      alignment_score = clamp(0.70 * overlap_fraction +
+        0.30 * phase_recurrence_score, 0, 1)
+    missing_data_behavior:
+      - "Unknown clock drift coarsens windows to the largest aggregation interval and lowers alignment_score by 0.15."
+      - "Missing compute or fabric coverage prevents strong alignment output."
+    minimum_coverage_requirement:
+      value: 0.80
+      unit: fraction
+      evidence_status: calibration_default
+      rationale: "Temporal overlap is unreliable when either timeline is sparse."
+      calibration_note: "Replace with source-specific sampling and clock-drift behavior."
+    known_false_positives_or_limits:
+      - "HPC/MPI and inference can align fabric and accelerator activity."
+      - "Asynchronous prefetching or checkpoint phases can reduce overlap for real training."
+    used_by_rules:
+      - collective_cadence_training
+      - sustained_ml_compute_nonserving
+      - high_fabric_activity_no_job_mapping
+      - benchmark_like_collective_counterevidence
+      - hpc_mpi_collective_alternative
+    source_refs: [S11, S12, S13, S14, S15, S16, S17]
+
+  - id: checkpoint_periodicity_score
+    input_features:
+      - storage_write_operation_bytes
+      - object_storage_operation_counts
+      - filesystem_throughput_metadata_ops
+      - compute_running_intervals
+      - allocated_accelerator_count_by_sku
+      - storage_operation_intervals
+    input_windows: "Storage write bursts and object/filesystem operation intervals aligned with accelerator activity and allocation/running windows."
+    output_type: object
+    output_fields:
+      - periodicity_score
+      - median_period_seconds
+      - write_burst_count
+      - aligned_compute_window
+      - activity_overlap_or_adjacency_fraction
+      - storage_operation_explanation_overlap_fraction
+      - single_write_only
+      - metadata_coherence_score
+    output_unit: mixed_object
+    score_range: [0.0, 1.0]
+    normalization: "Write bursts are normalized by participant count, memory/model estimate when available, and local storage write baseline."
+    formula: |
+      Detect write bursts where write rate or object PUT/COPY count exceeds
+      max(local p95 baseline, site calibrated checkpoint floor). Merge bursts
+      separated by less than the storage aggregation interval.
+      write_burst_count = count(merged bursts)
+      inter_burst_cv = coefficient_of_variation(time between burst starts)
+      timing_regularity = clamp(1 - inter_burst_cv / 0.75, 0, 1)
+      burst_count_score = clamp((write_burst_count - 1) / 3, 0, 1)
+      metadata_coherence_score = fraction of bursts with object/filesystem
+        metadata shape consistent with checkpoint writes when metadata exists
+      activity_overlap_or_adjacency_fraction =
+        bursts overlapping or within adjacency window of accelerator activity /
+        max(write_burst_count, 1)
+      periodicity_score = clamp(0.40 * timing_regularity +
+        0.25 * burst_count_score +
+        0.20 * metadata_coherence_score +
+        0.15 * activity_overlap_or_adjacency_fraction, 0, 1)
+      single_write_only = write_burst_count == 1
+    missing_data_behavior:
+      - "Without storage operation labels, keep score but mark counterevidence coverage missing."
+      - "Without activity coverage, route to `checkpoint_writes_no_accelerator_activity` rather than positive evidence."
+    minimum_coverage_requirement:
+      value: 0.80
+      unit: fraction
+      evidence_status: source_informed
+      rationale: "Storage logs can be best-effort or delayed; score requires covered write intervals."
+      calibration_note: "Replace with local storage logging coverage and delay."
+    default_parameters:
+      - name: checkpoint_activity_adjacency_window_seconds
+        value: 900
+        unit: seconds
+        evidence_status: calibration_default
+        source_refs: [S45, S46, S47]
+        rationale: "Allows checkpoint writes immediately before/after compute pauses with coarse telemetry."
+        counterevidence_or_failure_modes: ["long asynchronous uploads can exceed this", "backups may overlap by chance"]
+        calibration_note: "Tune by framework checkpoint flush and object-store behavior."
+    known_false_positives_or_limits:
+      - "Periodic backups, snapshots, ETL output, replication, and generated data can mimic checkpoint cadence."
+      - "Manual or preemption-driven checkpoints can be irregular."
+    used_by_rules:
+      - checkpoint_training_signature
+      - collective_cadence_training
+      - checkpoint_writes_no_accelerator_activity
+      - benchmark_like_collective_counterevidence
+      - lifecycle_preemption_context
+    source_refs: [S31, S32, S33, S34, S35, S45, S46, S47]
+
+  - id: checkpoint_size_consistency
+    input_features:
+      - storage_write_operation_bytes
+      - object_storage_operation_counts
+      - filesystem_throughput_metadata_ops
+      - hbm_or_device_memory_used
+      - memory_capacity_bytes
+      - allocated_accelerator_count_by_sku
+    input_windows: "Checkpoint-like write bursts identified by checkpoint_periodicity_score over the same participant and activity window."
+    output_type: object
+    output_fields:
+      - size_consistency_score
+      - consistency_label
+      - observed_bytes_per_checkpoint
+      - coefficient_of_variation
+      - normalized_checkpoint_size_score
+      - expected_range_source
+      - expected_min_bytes
+      - expected_max_bytes
+      - caveats
+    output_unit: mixed_object
+    score_range: [0.0, 1.0]
+    normalization: "Observed bytes are normalized by aggregate participant memory or a site/model-specific trainable-state estimate."
+    formula: |
+      observed_bytes_per_checkpoint = total write bytes in each merged burst
+      coefficient_of_variation = stddev(observed_bytes_per_checkpoint) /
+        max(mean(observed_bytes_per_checkpoint), epsilon)
+      size_repeat_score = clamp(1 - coefficient_of_variation / 0.50, 0, 1)
+      if trainable_state_model exists:
+        expected_range_source = trainable_state_model
+        normalized_size_score = 1 when mean bytes falls within expected range,
+          linearly decreasing to 0 at 0.5x lower or 2x upper range.
+      else:
+        expected_range_source = repeated_size_consistency
+        normalized_size_score = clamp(
+          mean(observed_bytes_per_checkpoint) /
+          max(0.05 * aggregate_participant_memory_bytes, epsilon), 0, 1)
+      size_consistency_score = clamp(0.65 * size_repeat_score +
+        0.35 * normalized_size_score, 0, 1)
+    missing_data_behavior:
+      - "Without memory capacity or model estimate, use repeated-size consistency only and lower expected_range_source confidence."
+      - "Deduplicated or incremental checkpoint systems must be marked as caveats."
+    minimum_coverage_requirement:
+      value: 0.80
+      unit: fraction
+      evidence_status: source_informed
+      rationale: "Size consistency needs covered writes for each burst."
+      calibration_note: "Replace with storage logging coverage and checkpoint implementation metadata."
+    known_false_positives_or_limits:
+      - "Backups and snapshots can have consistent sizes."
+      - "Adapter training, optimizer offload, sharded checkpoints, and deduplication can break simple size expectations."
+    used_by_rules:
+      - checkpoint_training_signature
+      - memory_residency_support
+      - storage_rebuild_backup_explanation
+    source_refs: [S31, S32, S33, S45, S46, S47]
+
+  - id: non_serving_score
+    input_features:
+      - load_balancer_gateway_flow_activity
+      - north_south_external_egress
+      - vpc_or_nsg_flow_records
+      - east_west_internal_flow_bytes
+      - container_resource_usage_quantity
+      - storage_read_operation_bytes
+      - storage_write_operation_bytes
+    input_windows: "Gateway, external, internal, container, and storage network windows aligned with the high-compute candidate window."
+    output_type: object
+    output_fields:
+      - non_serving_score
+      - serving_counterevidence_score
+      - gateway_connection_rate_score
+      - request_response_shape_score
+      - external_egress_response_score
+      - service_mesh_fanout_score
+      - external_traffic_explanations
+      - coverage_fraction
+    output_unit: mixed_object
+    score_range: [0.0, 1.0]
+    normalization: "Connection and egress features are normalized against local baseline for the same tenant/account/service boundary and window size."
+    formula: |
+      gateway_connection_rate_score = percentile_score(gateway connections or LB flows)
+      request_response_shape_score = score for high fan-in/fan-out,
+        short-lived connections, or response-like egress during compute
+      external_egress_response_score = percentile_score(north-south egress)
+        after subtracting explained dataset/artifact transfer intervals
+      service_mesh_fanout_score = percentile_score(east-west service traffic
+        not mapped to storage or accelerator fabric)
+      explanation_credit = score for documented staging, artifact export,
+        package install, logging, or storage operation intervals
+      serving_counterevidence_score = clamp(0.35 * gateway_connection_rate_score +
+        0.30 * request_response_shape_score +
+        0.20 * external_egress_response_score +
+        0.15 * service_mesh_fanout_score -
+        explanation_credit, 0, 1)
+      non_serving_score = clamp(1 - serving_counterevidence_score, 0, 1)
+    missing_data_behavior:
+      - "Missing serving telemetry does not imply non-serving; output coverage_fraction and lower confidence."
+      - "Known disabled flow logs must trigger telemetry coverage checks."
+    minimum_coverage_requirement:
+      value: 0.80
+      unit: fraction
+      evidence_status: source_informed
+      rationale: "Serving counterevidence depends on flow/gateway coverage, which can be sampled or aggregated."
+      calibration_note: "Replace with provider/network logging coverage and sampling settings."
+    known_false_positives_or_limits:
+      - "Batch inference can have low serving score."
+      - "Training data fetches and artifact exports can look like external serving without operation labels."
+    used_by_rules:
+      - collective_cadence_training
+      - sustained_ml_compute_nonserving
+      - achieved_ops_training_candidate
+      - serving_heavy_network_counterevidence
+      - storage_staging_support
+      - hpc_mpi_collective_alternative
+    source_refs: [S27, S28, S29, S30, S34]
+
+  - id: storage_staging_window
+    input_features:
+      - storage_read_operation_bytes
+      - object_storage_operation_counts
+      - object_or_file_copy_movement_records
+      - storage_operation_intervals
+      - north_south_external_egress
+      - data_center_interconnect_wan_usage
+      - compute_running_intervals
+    input_windows: "Read/copy/WAN/storage-operation intervals within a configurable lookback/lookahead around candidate compute windows."
+    output_type: object
+    output_fields:
+      - start_time
+      - end_time
+      - direction
+      - bytes
+      - normalized_staging_score
+      - route_class
+      - relation_to_compute_window
+      - overlap_fraction
+      - operation_type
+      - bytes_explained_fraction
+    output_unit: mixed_object
+    score_range: [0.0, 1.0]
+    normalization: "Bytes are normalized by participant count, device memory, local storage baseline, or site-provided dataset-size expectations."
+    formula: |
+      Classify intervals as copy_in, repeated_read, copy_out, backup,
+      restore, replication, migration, ETL, or unknown using storage operation
+      labels and direction. For candidate compute window W:
+        relation_to_compute_window = before, during, after, or unrelated
+        overlap_fraction = seconds(storage interval overlaps W) / seconds(storage interval)
+        normalized_staging_score = clamp(bytes /
+          max(aggregate_participant_memory_bytes, local_p95_storage_bytes, epsilon), 0, 1)
+        bytes_explained_fraction = bytes with matching operation labels / total bytes
+    missing_data_behavior:
+      - "Without operation labels, mark operation_type unknown and do not suppress checkpoint evidence solely from reads/writes."
+      - "Best-effort storage logs lower coverage and confidence."
+    minimum_coverage_requirement:
+      value: 0.75
+      unit: fraction
+      evidence_status: source_informed
+      rationale: "Staging support is weak if storage-operation visibility is sparse."
+      calibration_note: "Replace with object/filesystem logging coverage."
+    known_false_positives_or_limits:
+      - "Replication, backup, migration, ETL, and restore are common non-training explanations."
+      - "Dataset staging supports training only when joined with core activity evidence."
+    used_by_rules:
+      - storage_staging_support
+      - internal_data_movement_support
+      - high_fabric_activity_storage_or_backup_explanation
+      - storage_rebuild_backup_explanation
+    source_refs: [S31, S32, S33, S34, S35]
+
+  - id: telemetry_coverage_fraction
+    input_features:
+      - accelerator_busy_or_utilization_fraction
+      - tensor_matrix_mxu_neuron_or_engine_active_fraction
+      - generic_achieved_operation_rate
+      - scaleout_port_tx_rx_bytes_packets
+      - fabric_port_device_sample_counters
+      - storage_write_operation_bytes
+      - object_storage_operation_counts
+      - accelerator_device_power_energy
+      - rack_pdu_it_power
+      - vpc_or_nsg_flow_records
+      - accelerator_compute_billing_usage_intervals
+    input_windows: "Expected telemetry channels over a candidate, capacity, or discrepancy window after excluding documented source-disabled and maintenance intervals."
+    output_type: object
+    output_fields:
+      - channel
+      - expected_coverage_seconds
+      - observed_coverage_seconds
+      - coverage_fraction
+      - primary_channel_min
+      - primary_channel_mean
+      - missing_primary_channels
+      - known_caveats
+    output_unit: mixed_object
+    normalization: "Coverage is observed valid seconds divided by expected seconds for each source channel."
+    formula: |
+      For each expected channel c:
+        expected_seconds_c = window_seconds - documented_out_of_scope_seconds_c
+        observed_seconds_c = seconds with valid sample/interval/log records
+        coverage_fraction_c = observed_seconds_c / max(expected_seconds_c, epsilon)
+      primary_channel_min = min coverage over required primary channels
+      primary_channel_mean = mean coverage over required primary channels
+      missing_primary_channels = channels with coverage below rule threshold
+    missing_data_behavior:
+      - "Channels with unknown expected coverage are `unknown`, not zero."
+      - "Unknown expected coverage prevents strong negative claims and high-confidence non-serving conclusions."
+    minimum_coverage_requirement:
+      value: 0.80
+      unit: fraction
+      evidence_status: source_informed
+      rationale: "Common default for positive candidate triggers; individual rules can require more."
+      calibration_note: "Replace by source-specific sampling, aggregation, and delivery-delay behavior."
+    known_false_positives_or_limits:
+      - "Provider logs can be sampled, aggregated, delayed, or best-effort."
+      - "Billing and audit logs may not match telemetry windows exactly."
+    used_by_rules:
+      - cap_negative_certification_inputs
+      - telemetry_gap_during_candidate_training_window
+      - collective_cadence_training
+      - checkpoint_training_signature
+      - sustained_ml_compute_nonserving
+      - achieved_ops_training_candidate
+      - cap_cloud_capacity_constraint
+    source_refs: [S07, S08, S27, S28, S29, S30, S31, S35, S36, S37, S38, S39]
+
+  - id: clock_aligned_overlap_window
+    input_features:
+      - allocated_accelerator_count_by_sku
+      - compute_running_intervals
+      - tensor_matrix_mxu_neuron_or_engine_active_fraction
+      - generic_achieved_operation_rate
+      - scaleout_port_tx_rx_bytes_packets
+      - storage_write_operation_bytes
+      - accelerator_device_power_energy
+      - rack_pdu_it_power
+      - topology_change_events
+      - network_gateway_nat_route_state
+    input_windows: "All raw samples, intervals, and events used by a rule for a shared monitored scope."
+    output_type: object
+    output_fields:
+      - start_time
+      - end_time
+      - duration_seconds
+      - participating_features
+      - clock_alignment_confidence
+      - monitored_scope
+      - source_time_granularity_seconds
+      - coarsened_due_to_unknown_drift
+    output_unit: mixed_object
+    normalization: "All event and sample times are converted to a common timeline; unknown drift uses the coarsest source granularity."
+    formula: |
+      Apply source-specific clock offsets when known. Otherwise set
+      coarsened_due_to_unknown_drift = true and expand event/sample windows by
+      max(source_time_granularity_seconds). Intersect required feature windows
+      by monitored_scope mapping. Split output windows at all source boundaries.
+      clock_alignment_confidence = high when clock offsets are known, medium
+      when all sources share one control plane, low when windows are coarsened.
+    missing_data_behavior:
+      - "If required scope mapping is absent, no positive core rule may emit medium or strong confidence."
+      - "Low clock confidence lowers downstream alignment scores."
+    minimum_coverage_requirement:
+      value: 0.80
+      unit: fraction
+      evidence_status: calibration_default
+      rationale: "Aligned windows need covered required channels over the same scope."
+      calibration_note: "Replace with site clock synchronization and source timestamp accuracy."
+    known_false_positives_or_limits:
+      - "Coarse aggregation can create apparent overlap between unrelated events."
+      - "Clock drift can hide true ordering around checkpoint and fabric bursts."
+    used_by_rules:
+      - collective_cadence_training
+      - checkpoint_training_signature
+      - high_power_low_gpu_activity
+      - route_or_topology_change_during_candidate_window
+      - cap_capacity_upper_bound_flop
+    source_refs: [S18, S21, S22, S27, S28, S29, S30, S31, S42, S43]
