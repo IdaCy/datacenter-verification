@@ -1,0 +1,1076 @@
+schema_version: "0.1"
+created: "2026-05-16"
+source_inventory: observables/observables.yaml
+status: gated_aggregation_rule_spec
+
+purpose: >
+  Executable staged aggregation layer for joining sparse rule outputs
+  into algorithm-facing capacity, warning-height training-like, suppressor,
+  discrepancy, and final-routing claims. Aggregation consumes sparse rule
+  categories and labels by default; raw feature interpretation remains in the
+  active sparse rule files.
+
+source_and_calibration_policy:
+  online_research_checked: "2026-05-16"
+  source_ledger: observables/rules/source_ledger.yaml
+  notes:
+    - "S01 confirms the 1.0e25 FLOP policy-scale threshold; this is scale, not workload identity."
+    - "S07-S09 and S36-S39 support accelerator/activity telemetry surfaces but not portable training-identity thresholds."
+    - "S11-S17 support collective, sharded, and distributed-training communication mechanisms, while also showing why HPC/MPI and benchmark alternatives must be checked."
+    - "S28-S35 support flow-log, storage-log, and billing coverage/delay caveats; missing or delayed channels must not be treated as cleared suppressors."
+    - "S45-S47 support checkpoint and distributed-checkpoint storage behavior, but checkpoint-like writes can also be storage maintenance, copy, backup, restore, or export activity."
+
+aggregation_policy:
+  stage_order:
+    - A_capacity_gate
+    - B_training_candidate_detection
+    - C_discrepancy_and_explanation_review
+    - final_claim_routing
+  scope_join_policy:
+    default_scope_match: same_monitored_scope_or_mapped_child_scope
+    child_scope_rollup: "Roll up child scopes only when the mapping coverage is explicit for the candidate window."
+    no_hidden_capacity_policy: "Hidden, unknown, or out-of-scope capacity prevents strong negative certification."
+  window_segmentation_policy:
+    segmentation_signal: capacity_segment_window
+    split_at:
+      - inventory_validity_boundary
+      - advertised_peak_rate_validity_boundary
+      - quota_or_reservation_boundary
+      - running_or_billing_interval_boundary
+      - partition_interval_boundary
+      - maintenance_interval_boundary
+      - health_degraded_or_throttle_state_boundary
+      - electrical_service_or_installation_boundary
+      - topology_domain_or_route_change_boundary
+      - clock_drift_correction_boundary
+  short_circuit_policy:
+    stop_segment_if:
+      - label: capacity_ruled_out_for_scope
+        confidence: conservative_bound
+        min_coverage_fraction:
+          value_ref: min_capacity_ruleout_coverage_fraction
+        do_not_run_stages:
+          - B_training_candidate_detection
+          - C_discrepancy_and_explanation_review
+        rationale: "A high-coverage conservative upper bound below the policy threshold rules out threshold-scale compute for the monitored scope/window."
+    do_not_stop_if:
+      - capacity_unknown_due_to_missing_inputs
+      - capacity_limited_but_not_ruled_out
+      - capacity_possible_for_scope
+      - capacity_possible_under_sparse_assumptions
+  missing_data_policy:
+    general: "Missing primary, suppressor, coverage, or clock-alignment data emits an explicit missingness or inconclusive claim; it is not interpreted as absence."
+    suppressor_channels: "Missing expected suppressor channels block high warning heights."
+  final_warning_heights:
+    ordered_values:
+      - none
+      - weak_training_like_candidate
+      - medium_training_like_warning
+      - high_training_like_warning
+    hard_constraints:
+      - "Activity alone cannot produce any training-like warning above weak candidate routing."
+      - "Fabric evidence alone cannot produce a training-like warning."
+      - "Storage writes alone cannot produce a training-like warning."
+      - "Large compute alone emits large_compute_candidate or large_compute_training_identity_unresolved, not training."
+      - "High warning requires capacity possible/unknown, accelerator activity or achieved operations, at least two independent aligned B/supporting identity categories, checked suppressors, and no unresolved strong discrepancy."
+  global_calibration_defaults:
+    - name: min_capacity_ruleout_coverage_fraction
+      value: 0.90
+      unit: fraction
+      evidence_status: calibration_default
+      source_refs: [S07, S08, S09, S18, S23, S26, S35, S40, S41]
+      rationale: "Negative capacity claims require high coverage of inventory, service, availability, and peak-rate inputs."
+      counterevidence_or_failure_modes:
+        - "missing inventory, peak rate, electrical service, cloud scope, or hidden capacity can invalidate a rule-out"
+      calibration_note: "Replace with source-specific completeness guarantees for the monitored scope."
+    - name: policy_threshold_operations
+      value: 1.0e25
+      unit: operations
+      evidence_status: source_backed
+      source_refs: [S01, S03]
+      rationale: "Policy-scale compute threshold used for capacity and large-compute review; it is not workload identity."
+      counterevidence_or_failure_modes:
+        - "large inference, synthetic data generation, HPC, benchmarks, and burn-in can cross the same scale"
+      calibration_note: "Replace only if governing policy threshold changes."
+
+aggregation_rules:
+  - id: capacity_gate_segment_ruleout
+    purpose: capacity_gate
+    stage: A_capacity_gate
+    consumes:
+      rule_output_categories:
+        all:
+          - capacity_policy_scale
+        any:
+          - capacity_count_or_shape
+          - capacity_peak_rate
+          - capacity_availability
+          - capacity_power_service
+          - capacity_topology
+      derived_signals:
+        - capacity_segment_window
+        - capacity_upper_bound_flop
+        - telemetry_coverage_fraction
+        - clock_aligned_overlap_window
+    time_alignment:
+      segmentation: capacity_segment_window
+      scope_match: same_monitored_scope_or_mapped_child_scope
+      minimum_capacity_coverage_fraction:
+        value_ref: min_capacity_ruleout_coverage_fraction
+      clock_alignment_confidence:
+        value_ref: min_capacity_clock_alignment_confidence
+      missing_data_behavior: capacity_unknown_due_to_missing_inputs
+      short_circuit_behavior: "On emitted capacity_ruled_out_for_scope, stop B and C for this capacity segment."
+    trigger:
+      type: aggregation_gate_logic
+      conditions:
+        all:
+          - metric: capacity_upper_bound_flop.unit_normalized
+            op: "=="
+            value: true
+          - metric: capacity_upper_bound_flop.capacity_upper_bound_operations
+            op: "<"
+            value_ref: policy_threshold_operations
+          - metric: capacity_upper_bound_flop.coverage_fraction
+            op: ">="
+            value_ref: min_capacity_ruleout_coverage_fraction
+          - metric: clock_aligned_overlap_window.clock_alignment_confidence
+            op: ">="
+            value_ref: min_capacity_clock_alignment_confidence
+        none:
+          - metric: capacity_upper_bound_flop.hidden_or_unmonitored_capacity_possible
+            op: "=="
+            value: true
+          - metric: capacity_upper_bound_flop.missing_required_peak_rate
+            op: "=="
+            value: true
+    emitted_claim:
+      label: capacity_ruled_out_for_scope
+      stage_result: stop_segment
+      max_confidence: conservative_bound
+      warning_height: none
+      statement: "Threshold-scale compute is conservatively ruled out for the monitored scope/window."
+    missing_data_behavior: "Emit capacity_unknown_due_to_missing_inputs when coverage, unit normalization, scope mapping, clock alignment, peak rate, inventory, or service state is insufficient."
+    cannot_conclude:
+      - training
+      - no_non_threshold_training
+      - no_hidden_out_of_scope_run
+    calibration_defaults:
+      - name: policy_threshold_operations
+        value: 1.0e25
+        unit: operations
+        evidence_status: source_backed
+        source_refs: [S01, S03]
+        rationale: "Policy review scale for large compute; not workload identity."
+        counterevidence_or_failure_modes:
+          - "threshold-scale compute can be non-training"
+        calibration_note: "Replace only if governing policy threshold changes."
+      - name: min_capacity_ruleout_coverage_fraction
+        value: 0.90
+        unit: fraction
+        evidence_status: calibration_default
+        source_refs: [S07, S08, S09, S18, S23, S26, S35, S40, S41]
+        rationale: "Strong rule-out requires high capacity input coverage."
+        counterevidence_or_failure_modes:
+          - "missing inventory, peak rate, service, quota, or hidden capacity can invalidate rule-out"
+        calibration_note: "Replace with source-specific coverage requirements."
+      - name: min_capacity_clock_alignment_confidence
+        value: 0.80
+        unit: score_0_to_1
+        evidence_status: calibration_default
+        source_refs: [S18, S21, S22, S23, S26, S28, S29, S35]
+        rationale: "Capacity validity intervals and source records must align before a negative conclusion is trusted."
+        counterevidence_or_failure_modes:
+          - "clock drift or delayed cloud/provider records can shift apparent capacity boundaries"
+        calibration_note: "Replace with measured clock drift and source delivery-delay bounds."
+
+  - id: capacity_gate_live_segment_classification
+    purpose: capacity_gate
+    stage: A_capacity_gate
+    consumes:
+      rule_output_categories:
+        any:
+          - capacity_count_or_shape
+          - capacity_peak_rate
+          - capacity_memory
+          - capacity_topology
+          - capacity_availability
+          - capacity_power_service
+          - capacity_policy_scale
+      derived_signals:
+        - capacity_segment_window
+        - capacity_upper_bound_flop
+        - telemetry_coverage_fraction
+    time_alignment:
+      segmentation: capacity_segment_window
+      scope_match: same_monitored_scope_or_mapped_child_scope
+      minimum_overlap_fraction:
+        value_ref: min_capacity_live_overlap_fraction
+      missing_data_behavior: capacity_unknown_due_to_missing_inputs
+      short_circuit_behavior: "Never short-circuit B/C from this rule; live segments continue to B."
+    aggregation_logic:
+      ordered_classification:
+        - output: capacity_possible_for_scope
+          when:
+            all:
+              - metric: capacity_upper_bound_flop.capacity_upper_bound_operations
+                op: ">="
+                value_ref: policy_threshold_operations
+              - metric: capacity_upper_bound_flop.coverage_fraction
+                op: ">="
+                value_ref: min_capacity_possible_coverage_fraction
+        - output: capacity_limited_but_not_ruled_out
+          when:
+            all:
+              - category: capacity_availability
+              - metric: capacity_upper_bound_flop.coverage_fraction
+                op: "<"
+                value_ref: min_capacity_ruleout_coverage_fraction
+            any:
+              - category: capacity_count_or_shape
+              - category: capacity_peak_rate
+              - category: capacity_power_service
+        - output: capacity_unknown_due_to_missing_inputs
+          when:
+            any:
+              - missing_category: capacity_count_or_shape
+              - missing_category: capacity_peak_rate
+              - metric: telemetry_coverage_fraction.primary_channel_min
+                op: "<"
+                value_ref: min_capacity_possible_coverage_fraction
+    emitted_claim:
+      label: capacity_segment_live_for_B
+      possible_outputs:
+        - capacity_possible_for_scope
+        - capacity_limited_but_not_ruled_out
+        - capacity_unknown_due_to_missing_inputs
+      stage_result: continue_segment
+      max_confidence: weak
+      statement: "The capacity segment remains live for B candidate detection unless separately ruled out by a conservative high-coverage upper bound."
+    missing_data_behavior: "Emit capacity_unknown_due_to_missing_inputs and keep the segment live."
+    cannot_conclude:
+      - training
+      - capacity_ruled_out_for_scope
+    calibration_defaults:
+      - name: policy_threshold_operations
+        value: 1.0e25
+        unit: operations
+        evidence_status: source_backed
+        source_refs: [S01, S03]
+        rationale: "Policy-scale compute threshold for feasibility review."
+        counterevidence_or_failure_modes:
+          - "policy threshold does not classify workload type"
+        calibration_note: "Replace only if governing policy threshold changes."
+      - name: min_capacity_possible_coverage_fraction
+        value: 0.60
+        unit: fraction
+        evidence_status: calibration_default
+        source_refs: [S07, S08, S09, S18, S23, S26, S35]
+        rationale: "Live capacity classification can proceed at lower coverage than a negative rule-out because missingness keeps B/C alive."
+        counterevidence_or_failure_modes:
+          - "low coverage can overstate or understate available capacity"
+        calibration_note: "Tune by source coverage and audit risk tolerance."
+      - name: min_capacity_live_overlap_fraction
+        value: 0.50
+        unit: fraction
+        evidence_status: calibration_default
+        source_refs: [S18, S23, S26, S28, S29, S35]
+        rationale: "At least half-window overlap prevents stale capacity facts from classifying a live segment."
+        counterevidence_or_failure_modes:
+          - "short but important capacity changes can be diluted by this default"
+        calibration_note: "Replace with source-specific validity interval logic."
+
+  - id: large_compute_candidate_routing
+    purpose: large_compute_candidate_aggregation
+    stage: B_training_candidate_detection
+    consumes:
+      rule_output_categories:
+        any:
+          - large_compute_scale
+          - accelerator_activity_run_existence
+          - capacity_policy_scale
+      derived_signals:
+        - rule_output_join_window
+        - aggregation_candidate_seed_window
+        - achieved_operation_integral
+        - capacity_upper_bound_flop
+        - telemetry_coverage_fraction
+    time_alignment:
+      segmentation: aggregation_candidate_seed_window
+      scope_match: same_monitored_scope_or_mapped_child_scope
+      minimum_overlap_fraction:
+        value_ref: min_large_compute_capacity_overlap_fraction
+      missing_data_behavior: large_compute_training_identity_unresolved
+      allowed_adjacency_seconds:
+        value_ref: max_achieved_ops_capacity_adjacency_seconds
+    trigger:
+      type: large_compute_scale_logic
+      conditions:
+        all:
+          - metric: achieved_operation_integral.operation_count
+            op: ">="
+            value_ref: policy_threshold_operations
+          - metric: achieved_operation_integral.coverage_fraction
+            op: ">="
+            value_ref: min_large_compute_coverage_fraction
+        any:
+          - category: large_compute_scale
+          - category: accelerator_activity_run_existence
+    emitted_claim:
+      label: large_compute_candidate
+      alternate_outputs:
+        - large_compute_capacity_conflict
+        - large_compute_training_identity_unresolved
+      warning_height: none
+      max_confidence: medium
+      statement: "Achieved or inferred operations reach policy scale, but workload identity remains unresolved until joined with independent training-like evidence."
+    demotion_policy:
+      capacity_conflict: "If achieved_operation_integral exceeds capacity_upper_bound_flop by the configured ratio, emit large_compute_capacity_conflict and route to C."
+      no_identity_evidence: "If no fabric/checkpoint/non-serving identity-shape category aligns, emit large_compute_training_identity_unresolved."
+    missing_data_behavior: "If operation units, counter resets, or achieved-counter coverage are unresolved, route to C and suppress training-like promotion."
+    cannot_conclude:
+      - training
+      - distributed_training
+      - checkpoint_training
+    calibration_defaults:
+      - name: policy_threshold_operations
+        value: 1.0e25
+        unit: operations
+        evidence_status: source_backed
+        source_refs: [S01, S03]
+        rationale: "Large-compute policy threshold."
+        counterevidence_or_failure_modes:
+          - "large compute may be inference, HPC, synthetic-data generation, benchmarks, or burn-in"
+        calibration_note: "Replace only if governing policy threshold changes."
+      - name: min_large_compute_coverage_fraction
+        value: 0.75
+        unit: fraction
+        evidence_status: source_informed
+        source_refs: [S07, S08, S36, S37, S38, S39]
+        rationale: "Operation integrals require substantial achieved-counter or calibrated proxy coverage."
+        counterevidence_or_failure_modes:
+          - "counter gaps, unit mismatch, or proxy calibration can distort operation counts"
+        calibration_note: "Replace with counter-source reliability and unit-normalization tests."
+      - name: min_large_compute_capacity_overlap_fraction
+        value: 0.70
+        unit: fraction
+        evidence_status: calibration_default
+        source_refs: [S07, S08, S09, S23, S24, S26, S35]
+        rationale: "Achieved operations and capacity must mostly describe the same scope/window before conflict or feasibility routing."
+        counterevidence_or_failure_modes:
+          - "billing, running, and achieved-counter windows can lag or differ in scope"
+        calibration_note: "Tune by provider/accounting and counter aggregation behavior."
+      - name: max_achieved_ops_capacity_adjacency_seconds
+        value: 600
+        unit: seconds
+        evidence_status: calibration_default
+        source_refs: [S18, S23, S26, S28, S35]
+        rationale: "Allows short accounting, aggregation, and clock-boundary mismatches without merging unrelated windows."
+        counterevidence_or_failure_modes:
+          - "provider logs can be delayed by more than this; long jobs split at hour boundaries may need source-specific handling"
+        calibration_note: "Replace with measured source delivery and boundary behavior."
+
+  - id: distributed_training_like_candidate_promotion
+    purpose: training_candidate_promotion
+    stage: B_training_candidate_detection
+    consumes:
+      required_capacity_outputs:
+        any:
+          - capacity_possible_for_scope
+          - capacity_limited_but_not_ruled_out
+          - capacity_unknown_due_to_missing_inputs
+      rule_output_categories:
+        all:
+          - accelerator_activity_run_existence
+          - fabric_parameter_update_like
+        optional:
+          - non_serving_workload_shape
+          - topology_context_support
+          - physical_activity_support
+      derived_signals:
+        - rule_output_join_window
+        - aggregation_candidate_seed_window
+        - warning_height_score
+        - suppression_resolution_state
+        - telemetry_coverage_fraction
+        - clock_aligned_overlap_window
+    time_alignment:
+      segmentation: aggregation_candidate_seed_window
+      scope_match: same_monitored_scope_or_mapped_child_scope
+      minimum_overlap_fraction:
+        value_ref: min_activity_identity_overlap_fraction
+      minimum_coverage_fraction:
+        value_ref: min_primary_B_channel_coverage_fraction
+      missing_data_behavior: "candidate_requires_manual_review if suppressor or primary coverage is below threshold."
+      allowed_adjacency_seconds:
+        value_ref: max_fabric_activity_adjacency_seconds
+    trigger:
+      type: independent_category_promotion_logic
+      conditions:
+        all:
+          - capacity_output:
+              any:
+                - capacity_possible_for_scope
+                - capacity_limited_but_not_ruled_out
+                - capacity_unknown_due_to_missing_inputs
+          - category: accelerator_activity_run_existence
+          - category: fabric_parameter_update_like
+          - metric: rule_output_join_window.overlap_fraction
+            op: ">="
+            value_ref: min_activity_identity_overlap_fraction
+          - metric: telemetry_coverage_fraction.primary_channel_min
+            op: ">="
+            value_ref: min_primary_B_channel_coverage_fraction
+        none:
+          - label: capacity_ruled_out_for_scope
+          - suppression_state: strong_unresolved_suppressor
+    emitted_claim:
+      label: distributed_training_like_candidate
+      warning_height_by_score:
+        weak_training_like_candidate: "activity plus fabric identity shape align, but support or suppressor review is incomplete."
+        medium_training_like_warning: "activity plus fabric identity shape align with checked suppressors and at least one support or non-serving category."
+        high_training_like_warning: "activity plus fabric identity shape align with a second independent identity/support category, checked suppressors, high coverage, and no unresolved discrepancy."
+      max_confidence: medium
+      statement: "Aligned accelerator activity and collective-like fabric behavior form a distributed training-like candidate; final warning height depends on suppressor and discrepancy review."
+    suppression_policy:
+      checked_suppressors:
+        - serving_counterevidence
+        - benchmark_hpc_alternative
+        - storage_operation_explanation
+        - topology_route_conflict
+      missing_suppressor_behavior: "Cap at weak_training_like_candidate and emit inconclusive_due_to_missingness."
+      strong_suppressor_behavior: "Emit candidate_demoted_by_unresolved_suppressor or candidate_benchmark_like."
+    missing_data_behavior: "Missing fabric/activity coverage, clock alignment, or suppressor state prevents medium/high warning."
+    cannot_conclude:
+      - high_training_like_warning_from_activity_alone
+      - high_training_like_warning_from_fabric_alone
+      - final_training_claim_without_C_when_suppressors_present
+    calibration_defaults:
+      - name: min_activity_identity_overlap_fraction
+        value: 0.60
+        unit: fraction
+        evidence_status: calibration_default
+        source_refs: [S11, S12, S13, S14, S16, S17, S28, S29]
+        rationale: "Compute and fabric phases should substantially overlap for distributed training-like promotion, while allowing aggregation and phase lag."
+        counterevidence_or_failure_modes:
+          - "asynchronous prefetch, gradient accumulation, coarse flow logs, HPC, and distributed inference can change overlap shape"
+        calibration_note: "Calibrate with local step traces, flow-log intervals, and known non-training workloads."
+      - name: min_primary_B_channel_coverage_fraction
+        value: 0.75
+        unit: fraction
+        evidence_status: source_informed
+        source_refs: [S07, S08, S28, S29, S36, S37, S38, S39, S42, S43]
+        rationale: "B candidate promotion needs substantial coverage of activity and identity-shape channels."
+        counterevidence_or_failure_modes:
+          - "sampled flow logs or missing device counters can overstate or understate alignment"
+        calibration_note: "Replace with per-source coverage and sampling guarantees."
+      - name: max_fabric_activity_adjacency_seconds
+        value: 300
+        unit: seconds
+        evidence_status: calibration_default
+        source_refs: [S11, S12, S13, S14, S28, S29, S42, S43]
+        rationale: "Allows coarse fabric aggregation and phase relation without joining unrelated runs."
+        counterevidence_or_failure_modes:
+          - "long checkpoint or communication phases may sit outside this default; coarse logs may require wider windows"
+        calibration_note: "Tune by fabric telemetry aggregation interval and clock drift."
+
+  - id: checkpoint_training_like_candidate_promotion
+    purpose: training_candidate_promotion
+    stage: B_training_candidate_detection
+    consumes:
+      required_capacity_outputs:
+        any:
+          - capacity_possible_for_scope
+          - capacity_limited_but_not_ruled_out
+          - capacity_unknown_due_to_missing_inputs
+      rule_output_categories:
+        all:
+          - accelerator_activity_run_existence
+          - storage_checkpoint_state_like
+        optional:
+          - data_lifecycle_support
+          - lifecycle_operational_context
+          - physical_activity_support
+      derived_signals:
+        - aggregation_candidate_seed_window
+        - rule_output_join_window
+        - warning_height_score
+        - suppression_resolution_state
+        - checkpoint_periodicity_score
+        - telemetry_coverage_fraction
+    time_alignment:
+      segmentation: aggregation_candidate_seed_window
+      scope_match: same_monitored_scope_or_mapped_child_scope
+      minimum_adjacency_fraction:
+        value_ref: min_checkpoint_activity_adjacency_fraction
+      allowed_adjacency_seconds:
+        value_ref: max_checkpoint_activity_adjacency_seconds
+      minimum_coverage_fraction:
+        value_ref: min_primary_B_channel_coverage_fraction
+      missing_data_behavior: "candidate_requires_manual_review if storage-operation explanations are unavailable."
+    trigger:
+      type: adjacent_identity_promotion_logic
+      conditions:
+        all:
+          - capacity_output:
+              any:
+                - capacity_possible_for_scope
+                - capacity_limited_but_not_ruled_out
+                - capacity_unknown_due_to_missing_inputs
+          - category: accelerator_activity_run_existence
+          - category: storage_checkpoint_state_like
+          - metric: rule_output_join_window.adjacency_or_overlap_fraction
+            op: ">="
+            value_ref: min_checkpoint_activity_adjacency_fraction
+          - metric: telemetry_coverage_fraction.primary_channel_min
+            op: ">="
+            value_ref: min_primary_B_channel_coverage_fraction
+        none:
+          - label: capacity_ruled_out_for_scope
+    emitted_claim:
+      label: checkpoint_training_like_candidate
+      warning_height_by_score:
+        weak_training_like_candidate: "activity and checkpoint-like storage are adjacent or overlapping, but explanation review is incomplete."
+        medium_training_like_warning: "activity and repeated checkpoint-like storage align with checked storage-operation explanations."
+        high_training_like_warning: "checkpoint-like storage aligns with activity plus another independent identity channel, checked suppressors, high coverage, and no unresolved discrepancy."
+      max_confidence: medium
+      statement: "Aligned accelerator activity and checkpoint-like state writes form a training-like checkpoint candidate; storage-operation explanations must be adjudicated before promotion."
+    suppression_policy:
+      checked_suppressors:
+        - storage_operation_explanation
+        - storage_activity_conflict
+        - serving_counterevidence
+        - lifecycle_operational_context
+      missing_suppressor_behavior: "Emit inconclusive_due_to_missingness and cap at weak_training_like_candidate."
+      strong_suppressor_behavior: "Emit candidate_explained_by_storage_operation."
+    missing_data_behavior: "Missing storage-operation channels block medium/high warning rather than clearing storage explanations."
+    demotion_policy:
+      storage_operation_explanation_present: "Do not block candidate emission in B; attach the explanation to suppression_resolution_state and route to C for demotion or explanation."
+    cannot_conclude:
+      - high_training_like_warning_from_storage_writes_alone
+      - final_training_claim_without_storage_explanation_review
+    calibration_defaults:
+      - name: min_checkpoint_activity_adjacency_fraction
+        value: 0.50
+        unit: fraction
+        evidence_status: calibration_default
+        source_refs: [S45, S46, S47]
+        rationale: "Checkpoint writes can lag or trail compute, so adjacency can be weaker than same-second overlap."
+        counterevidence_or_failure_modes:
+          - "backup, restore, replication, ETL, and synthetic-data output can look checkpoint-like"
+        calibration_note: "Calibrate against local checkpoint cadence and storage-operation logs."
+      - name: max_checkpoint_activity_adjacency_seconds
+        value: 1800
+        unit: seconds
+        evidence_status: calibration_default
+        source_refs: [S31, S32, S33, S45, S46, S47]
+        rationale: "Allows delayed checkpoint flushes and object/filesystem logging lag without joining unrelated storage jobs by default."
+        counterevidence_or_failure_modes:
+          - "large asynchronous checkpoint systems may flush longer; cloud storage logs can be delayed or best-effort"
+        calibration_note: "Replace with framework, storage system, and log-delivery measurements."
+      - name: min_primary_B_channel_coverage_fraction
+        value: 0.75
+        unit: fraction
+        evidence_status: source_informed
+        source_refs: [S07, S08, S31, S32, S33, S36, S37, S38, S39]
+        rationale: "B candidate promotion needs substantial activity and storage-channel coverage."
+        counterevidence_or_failure_modes:
+          - "object logs and filesystem metrics may be delayed, sampled, or not enabled"
+        calibration_note: "Replace with source-specific coverage guarantees."
+
+  - id: sparse_large_compute_training_like_candidate_promotion
+    purpose: training_candidate_promotion
+    stage: B_training_candidate_detection
+    consumes:
+      required_prior_outputs:
+        all:
+          - large_compute_candidate
+        any:
+          - distributed_training_like_candidate
+          - checkpoint_training_like_candidate
+      rule_output_categories:
+        any:
+          - fabric_parameter_update_like
+          - storage_checkpoint_state_like
+          - non_serving_workload_shape
+      derived_signals:
+        - aggregation_candidate_seed_window
+        - warning_height_score
+        - suppression_resolution_state
+        - achieved_operation_integral
+    time_alignment:
+      segmentation: aggregation_candidate_seed_window
+      scope_match: same_monitored_scope_or_mapped_child_scope
+      minimum_overlap_fraction:
+        value_ref: min_large_compute_identity_overlap_fraction
+      missing_data_behavior: large_compute_training_identity_unresolved
+      short_circuit_behavior: "Do not run this rule in capacity_ruled_out_for_scope segments."
+    trigger:
+      type: large_compute_plus_identity_logic
+      conditions:
+        all:
+          - label: large_compute_candidate
+          - metric: achieved_operation_integral.operation_count
+            op: ">="
+            value_ref: policy_threshold_operations
+          - metric: suppression_resolution_state.strong_unresolved_suppressor_count
+            op: "=="
+            value: 0
+        any:
+          - label: distributed_training_like_candidate
+          - label: checkpoint_training_like_candidate
+    emitted_claim:
+      label: sparse_large_compute_training_like_candidate
+      warning_height_by_score:
+        medium_training_like_warning: "large compute plus one independent training-like identity channel with checked suppressors."
+        high_training_like_warning: "large compute plus two independent aligned identity/support channels, high coverage, checked suppressors, and no unresolved C conflict."
+      max_confidence: medium
+      statement: "Policy-scale compute plus independent training-like identity evidence forms a sparse large-compute training-like candidate."
+    suppression_policy:
+      checked_suppressors:
+        - serving_counterevidence
+        - storage_operation_explanation
+        - benchmark_hpc_alternative
+        - activity_attribution_conflict
+        - capacity_claim_conflict
+      missing_suppressor_behavior: "Emit large_compute_training_identity_unresolved or inconclusive_due_to_missingness."
+    missing_data_behavior: "Large compute without identity or suppressor resolution remains unresolved."
+    cannot_conclude:
+      - training_from_large_compute_alone
+      - high_warning_with_unresolved_strong_suppressor
+    calibration_defaults:
+      - name: policy_threshold_operations
+        value: 1.0e25
+        unit: operations
+        evidence_status: source_backed
+        source_refs: [S01, S03]
+        rationale: "Large-compute policy threshold."
+        counterevidence_or_failure_modes:
+          - "threshold crossing is not workload identity"
+        calibration_note: "Replace only if governing policy threshold changes."
+      - name: min_large_compute_identity_overlap_fraction
+        value: 0.50
+        unit: fraction
+        evidence_status: calibration_default
+        source_refs: [S11, S12, S13, S14, S16, S17, S45, S46, S47]
+        rationale: "Large achieved-operation windows can be broader than identity-shape windows, so half-window overlap is enough for candidate routing."
+        counterevidence_or_failure_modes:
+          - "short identity bursts can over-promote broad compute windows; storage and benchmark alternatives remain important"
+        calibration_note: "Tune by job-level known workload traces."
+
+  - id: support_context_aggregation
+    purpose: support_context_aggregation
+    stage: B_training_candidate_detection
+    consumes:
+      required_prior_outputs:
+        any:
+          - distributed_training_like_candidate
+          - checkpoint_training_like_candidate
+          - sparse_large_compute_training_like_candidate
+      rule_output_categories:
+        any:
+          - physical_activity_support
+          - large_model_context_support
+          - data_lifecycle_support
+          - topology_context_support
+          - lifecycle_operational_context
+      derived_signals:
+        - aggregation_candidate_review_window
+        - rule_output_join_window
+        - warning_height_score
+    time_alignment:
+      segmentation: aggregation_candidate_review_window
+      scope_match: same_monitored_scope_or_mapped_child_scope
+      minimum_overlap_fraction:
+        value_ref: min_support_candidate_overlap_fraction
+      allowed_adjacency_seconds:
+        value_ref: max_support_candidate_adjacency_seconds
+      missing_data_behavior: "Support absence does not demote by itself; missing expected support coverage is reported."
+    aggregation_logic:
+      outputs:
+        - label: candidate_context_strengthened
+          when: "A core B candidate already exists and support overlaps or is adjacent within the configured window."
+        - label: candidate_context_weak_only
+          when: "Only weak support categories exist beside a candidate, without a second identity-shape category."
+        - label: support_present_but_no_training_identity
+          when: "Support categories exist without accelerator activity plus fabric/checkpoint identity evidence."
+    emitted_claim:
+      label: candidate_context_strengthened
+      alternate_outputs:
+        - candidate_context_weak_only
+        - support_present_but_no_training_identity
+      warning_height_effect: "May raise review priority or contribute to moving weak to medium only when core B evidence is already present and suppressors are checked; this changes routing warning height, not this support rule's standalone evidentiary confidence."
+      max_confidence: weak
+      statement: "Support context can strengthen or route a live candidate but is not primary workload identity evidence."
+    missing_data_behavior: "Missing support is recorded but does not clear or prove training."
+    cannot_conclude:
+      - training_from_support_only
+      - warning_height_from_power_only
+      - warning_height_from_memory_only
+      - warning_height_from_topology_only
+    calibration_defaults:
+      - name: min_support_candidate_overlap_fraction
+        value: 0.40
+        unit: fraction
+        evidence_status: calibration_default
+        source_refs: [S07, S08, S09, S31, S32, S33, S40, S41]
+        rationale: "Support signals such as power, cooling, staging, and lifecycle events may lag or precede core activity."
+        counterevidence_or_failure_modes:
+          - "support windows can reflect unrelated physical load, data movement, or maintenance"
+        calibration_note: "Calibrate by support-source lag and local workload traces."
+      - name: max_support_candidate_adjacency_seconds
+        value: 1800
+        unit: seconds
+        evidence_status: calibration_default
+        source_refs: [S31, S32, S33, S40, S41]
+        rationale: "Allows thermal/cooling and storage lifecycle lag while keeping support local to the candidate."
+        counterevidence_or_failure_modes:
+          - "facility cooling response and storage staging can have longer lags in some sites"
+        calibration_note: "Replace with site thermal, storage, and lifecycle timing distributions."
+
+  - id: suppressor_and_explanation_aggregation
+    purpose: suppressor_and_explanation_aggregation
+    stage: C_discrepancy_and_explanation_review
+    consumes:
+      required_prior_outputs:
+        any:
+          - distributed_training_like_candidate
+          - checkpoint_training_like_candidate
+          - sparse_large_compute_training_like_candidate
+      rule_output_categories:
+        any:
+          - serving_counterevidence
+          - storage_operation_explanation
+          - benchmark_hpc_alternative
+          - storage_activity_conflict
+          - topology_route_conflict
+          - suppressors_alternative_explanations
+      derived_signals:
+        - aggregation_candidate_review_window
+        - suppression_resolution_state
+        - rule_output_join_window
+        - telemetry_coverage_fraction
+    time_alignment:
+      segmentation: aggregation_candidate_review_window
+      scope_match: same_monitored_scope_or_mapped_child_scope
+      minimum_overlap_fraction:
+        value_ref: min_suppressor_candidate_overlap_fraction
+      allowed_adjacency_seconds:
+        value_ref: max_suppressor_candidate_adjacency_seconds
+      missing_data_behavior: candidate_requires_manual_review
+      short_circuit_behavior: "Do not run after capacity_ruled_out_for_scope unless reviewing a separate out-of-scope or integrity claim."
+    aggregation_logic:
+      demotion_outputs:
+        - candidate_explained_by_serving
+        - candidate_explained_by_storage_operation
+        - candidate_benchmark_like
+        - candidate_hpc_mpi_alternative
+        - candidate_demoted_by_unresolved_suppressor
+      missingness_output: inconclusive_due_to_missingness
+      rules:
+        - "Serving counterevidence overlapping accelerator activity demotes non-serving and fabric/checkpoint candidates."
+        - "Storage operation explanations overlapping checkpoint-like or fabric/storage activity explain those candidates unless independent fabric and non-serving identity remains."
+        - "Benchmark/HPC alternatives demote fabric-heavy candidates before high warning."
+        - "Missing expected suppressor channels cap warning height at weak and require manual review."
+    emitted_claim:
+      label: candidate_demoted_by_unresolved_suppressor
+      possible_outputs:
+        - candidate_explained_by_serving
+        - candidate_explained_by_storage_operation
+        - candidate_benchmark_like
+        - candidate_hpc_mpi_alternative
+        - inconclusive_due_to_missingness
+      warning_height_effect: "Demote or block medium/high promotion until explanation is resolved."
+      max_confidence: not_applicable
+      statement: "Suppressors and benign explanations are adjudicated before final warning-height promotion."
+    missing_data_behavior: "Expected but missing suppressor channels emit inconclusive_due_to_missingness, not cleared suppressors."
+    cannot_conclude:
+      - cleared_suppressors_from_missing_channels
+      - high_training_like_warning_with_unresolved_suppressor
+    calibration_defaults:
+      - name: min_suppressor_candidate_overlap_fraction
+        value: 0.50
+        unit: fraction
+        evidence_status: calibration_default
+        source_refs: [S28, S29, S31, S32, S33, S45, S46, S47]
+        rationale: "An explanation should overlap a material portion of the candidate window before demoting it."
+        counterevidence_or_failure_modes:
+          - "broad maintenance or backup windows can over-explain unrelated activity"
+        calibration_note: "Tune by operation-log precision and workload-specific explanation coverage."
+      - name: max_suppressor_candidate_adjacency_seconds
+        value: 1800
+        unit: seconds
+        evidence_status: calibration_default
+        source_refs: [S28, S31, S32, S33]
+        rationale: "Allows best-effort network/storage log delivery and adjacent storage operations without joining distant events."
+        counterevidence_or_failure_modes:
+          - "cloud logs can be delayed longer; high-throughput storage operations can span broader windows"
+        calibration_note: "Replace with source delivery delay and operation-duration distributions."
+
+  - id: discrepancy_targeted_escalation
+    purpose: discrepancy_escalation_aggregation
+    stage: C_discrepancy_and_explanation_review
+    consumes:
+      required_prior_outputs:
+        any:
+          - distributed_training_like_candidate
+          - checkpoint_training_like_candidate
+          - sparse_large_compute_training_like_candidate
+          - large_compute_capacity_conflict
+          - large_compute_training_identity_unresolved
+          - candidate_requires_manual_review
+      rule_output_categories:
+        any:
+          - activity_attribution_conflict
+          - capacity_claim_conflict
+          - physical_timeline_conflict
+          - power_activity_conflict
+          - fabric_mapping_conflict
+          - storage_activity_conflict
+          - telemetry_missingness_conflict
+          - health_throttle_conflict
+          - topology_route_conflict
+      derived_signals:
+        - aggregation_candidate_review_window
+        - capacity_segment_window
+        - rule_output_join_window
+        - telemetry_coverage_fraction
+        - suppression_resolution_state
+    time_alignment:
+      segmentation: aggregation_candidate_review_window
+      scope_match: same_monitored_scope_or_mapped_child_scope
+      minimum_overlap_fraction:
+        value_ref: min_discrepancy_candidate_overlap_fraction
+      missing_data_behavior: inconclusive_due_to_missingness
+      short_circuit_behavior: "Do not run globally after capacity_ruled_out_for_scope; run only for live candidates, capacity conflicts, or decision-blocking missingness."
+    trigger:
+      type: targeted_C_routing_logic
+      conditions:
+        any:
+          - label: distributed_training_like_candidate
+          - label: checkpoint_training_like_candidate
+          - label: sparse_large_compute_training_like_candidate
+          - label: large_compute_capacity_conflict
+          - label: candidate_requires_manual_review
+          - category: telemetry_missingness_conflict
+          - category: capacity_claim_conflict
+    emitted_claim:
+      label: integrity_review_required
+      possible_outputs:
+        - activity_attribution_conflict
+        - capacity_claim_conflict
+        - inconclusive_due_to_missingness
+        - candidate_requires_manual_review
+      warning_height_effect: "Unresolved high/critical C findings block high warning and route to manual review."
+      max_confidence: high
+      statement: "Targeted C findings are escalated only when they adjudicate a live candidate, capacity conflict, or missingness that blocks a decision."
+    missing_data_behavior: "Decision-blocking gaps emit inconclusive_due_to_missingness."
+    cannot_conclude:
+      - global_C_required_after_capacity_ruleout
+      - high_warning_with_unresolved_capacity_conflict
+    calibration_defaults:
+      - name: min_discrepancy_candidate_overlap_fraction
+        value: 0.50
+        unit: fraction
+        evidence_status: calibration_default
+        source_refs: [S18, S21, S22, S23, S26, S28, S29, S31, S35]
+        rationale: "A discrepancy should affect a material part of the candidate or capacity-conflict window before blocking final routing."
+        counterevidence_or_failure_modes:
+          - "short severe conflicts may still matter; long audit windows can dilute brief manipulation or outages"
+        calibration_note: "Tune by severity, source precision, and audit policy."
+
+  - id: no_training_candidate_coverage_gate
+    purpose: negative_screen_integrity
+    stage: C_discrepancy_and_explanation_review
+    consumes:
+      required_capacity_outputs:
+        any:
+          - capacity_possible_for_scope
+          - capacity_limited_but_not_ruled_out
+          - capacity_unknown_due_to_missing_inputs
+      excluded_prior_outputs:
+        any:
+          - distributed_training_like_candidate
+          - checkpoint_training_like_candidate
+          - sparse_large_compute_training_like_candidate
+          - large_compute_candidate
+      rule_output_categories:
+        optional:
+          - telemetry_missingness_conflict
+          - activity_attribution_conflict
+          - fabric_mapping_conflict
+      derived_signals:
+        - capacity_segment_window
+        - aggregation_candidate_seed_window
+        - negative_screen_required_coverage_state
+        - telemetry_coverage_fraction
+        - clock_aligned_overlap_window
+    time_alignment:
+      segmentation: capacity_segment_window
+      scope_match: same_monitored_scope_or_mapped_child_scope
+      minimum_primary_coverage_fraction:
+        value_ref: min_negative_screen_primary_coverage_fraction
+      clock_alignment_confidence:
+        value_ref: min_negative_screen_clock_alignment_confidence
+      missing_data_behavior: inconclusive_due_to_missingness
+      short_circuit_behavior: "Do not run after capacity_ruled_out_for_scope; this is only for live capacity segments where B found no candidate."
+      global_C_policy: "Run coverage, scope, clock, and missingness checks needed to trust the negative screen; do not run unrelated suppressor or discrepancy checks globally."
+    trigger:
+      type: negative_screen_integrity_logic
+      conditions:
+        all:
+          - capacity_output:
+              any:
+                - capacity_possible_for_scope
+                - capacity_limited_but_not_ruled_out
+                - capacity_unknown_due_to_missing_inputs
+          - metric: negative_screen_required_coverage_state.primary_activity_coverage_fraction
+            op: ">="
+            value_ref: min_negative_screen_primary_coverage_fraction
+          - metric: negative_screen_required_coverage_state.identity_shape_coverage_fraction
+            op: ">="
+            value_ref: min_negative_screen_identity_coverage_fraction
+          - metric: negative_screen_required_coverage_state.scope_mapping_coverage_fraction
+            op: ">="
+            value_ref: min_negative_screen_scope_mapping_coverage_fraction
+          - metric: negative_screen_required_coverage_state.clock_alignment_confidence
+            op: ">="
+            value_ref: min_negative_screen_clock_alignment_confidence
+        none:
+          - label: distributed_training_like_candidate
+          - label: checkpoint_training_like_candidate
+          - label: sparse_large_compute_training_like_candidate
+          - label: large_compute_candidate
+          - metric: negative_screen_required_coverage_state.decision_blocking_missingness
+            op: "=="
+            value: true
+    emitted_claim:
+      label: negative_screen_coverage_sufficient
+      alternate_outputs:
+        - negative_screen_blocked_by_missingness
+        - inconclusive_due_to_missingness
+        - integrity_review_required
+      warning_height: none
+      max_confidence: conservative_bound
+      statement: "No B candidate was detected in a live segment and the required primary, identity-shape, scope-mapping, and clock-alignment coverage is sufficient to treat the absence of evidence as a covered negative screen."
+    missing_data_behavior: "If required negative-screen channels are missing, emit negative_screen_blocked_by_missingness or inconclusive_due_to_missingness instead of a clean negative screen."
+    cannot_conclude:
+      - no_training_outside_monitored_scope
+      - no_training_from_uncovered_channels
+      - no_training_from_missing_activity_telemetry
+      - global_C_clearance
+    calibration_defaults:
+      - name: min_negative_screen_primary_coverage_fraction
+        value: 0.75
+        unit: fraction
+        evidence_status: calibration_default
+        source_refs: [S07, S08, S36, S37, S38, S39]
+        rationale: "Reuses existing positive-candidate coverage defaults; no-candidate routing is trustworthy only when primary activity channels substantially cover the live segment."
+        counterevidence_or_failure_modes:
+          - "collector outages, disabled profiling counters, or unmapped devices can create false negative screens"
+        calibration_note: "Replace with source-specific accelerator telemetry coverage requirements."
+      - name: min_negative_screen_identity_coverage_fraction
+        value: 0.75
+        unit: fraction
+        evidence_status: calibration_default
+        source_refs: [S28, S29, S31, S32, S33, S42, S43, S45, S46, S47]
+        rationale: "Fabric/checkpoint identity channels must be substantially covered before their absence is meaningful."
+        counterevidence_or_failure_modes:
+          - "sampled flow logs, disabled object logs, or unmapped fabric ports can hide identity-shape evidence"
+        calibration_note: "Replace with source-specific fabric and storage logging coverage."
+      - name: min_negative_screen_scope_mapping_coverage_fraction
+        value: 0.75
+        unit: fraction
+        evidence_status: calibration_default
+        source_refs: [S18, S19, S20, S23, S26, S35]
+        rationale: "A negative screen must map telemetry to the monitored scope well enough to know which assets were covered."
+        counterevidence_or_failure_modes:
+          - "scheduler, billing, or provider scope mismatch can make active assets invisible to the monitored scope"
+        calibration_note: "Replace with site-specific scheduler, provider, and asset-mapping coverage."
+      - name: min_negative_screen_clock_alignment_confidence
+        value: 0.80
+        unit: score_0_to_1
+        evidence_status: calibration_default
+        source_refs: [S18, S21, S22, S27, S28, S29, S31, S35]
+        rationale: "Negative screens need aligned source windows so absent activity is not an artifact of clock drift or delayed records."
+        counterevidence_or_failure_modes:
+          - "coarse aggregation, clock drift, or delayed logs can move evidence outside the checked window"
+        calibration_note: "Replace with measured timestamp accuracy and delivery-delay bounds."
+
+  - id: final_algorithm_claim_routing
+    purpose: final_claim_routing
+    stage: final_claim_routing
+    consumes:
+      required_prior_outputs:
+        any:
+          - capacity_ruled_out_for_scope
+          - capacity_possible_for_scope
+          - capacity_limited_but_not_ruled_out
+          - capacity_unknown_due_to_missing_inputs
+          - distributed_training_like_candidate
+          - checkpoint_training_like_candidate
+          - sparse_large_compute_training_like_candidate
+          - candidate_explained_by_serving
+          - candidate_explained_by_storage_operation
+          - candidate_benchmark_like
+          - candidate_hpc_mpi_alternative
+          - negative_screen_coverage_sufficient
+          - negative_screen_blocked_by_missingness
+          - integrity_review_required
+          - inconclusive_due_to_missingness
+      derived_signals:
+        - capacity_segment_window
+        - aggregation_candidate_final_window
+        - negative_screen_required_coverage_state
+        - warning_height_score
+        - suppression_resolution_state
+    time_alignment:
+      segmentation: capacity_segment_window
+      scope_match: same_monitored_scope_or_mapped_child_scope
+      minimum_output_window_coverage_fraction:
+        value_ref: min_final_routing_window_coverage_fraction
+      missing_data_behavior: inconclusive_due_to_missingness
+      short_circuit_behavior: "If capacity_ruled_out_for_scope was emitted for the segment, final route is rule-out and B/C outputs are absent for that segment."
+    aggregation_logic:
+      final_routes:
+        - final_claim: capacity_ruled_out_for_scope
+          when: "A_capacity_gate emitted a conservative high-coverage rule-out."
+        - final_claim: high_training_like_warning
+          when: "At least two independent aligned B identity/support categories are present, warning_height_score.high is true, suppressors are checked, and no unresolved high/critical C conflict exists."
+        - final_claim: medium_training_like_warning
+          when: "One core identity-shape pathway aligns with activity and capacity remains live, suppressors are checked or weakly unresolved, and C has no blocking conflict."
+        - final_claim: weak_training_like_candidate
+          when: "A sparse B candidate exists but support, suppressor, coverage, or C review is incomplete."
+        - final_claim: candidate_explained_or_demoted
+          when: "Suppressor/explanation aggregation explains or demotes the candidate."
+        - final_claim: no_training_like_candidate_detected_in_covered_live_segment
+          when: "Capacity remains live, no B candidate labels exist, negative_screen_coverage_sufficient was emitted, and no decision-blocking missingness exists."
+        - final_claim: inconclusive_due_to_missingness
+          when: "Missing data blocks capacity, identity, suppressor, or discrepancy adjudication."
+    emitted_claim:
+      label: final_algorithm_facing_claim
+      final_claim_labels:
+        - capacity_ruled_out_for_scope
+        - weak_training_like_candidate
+        - medium_training_like_warning
+        - high_training_like_warning
+        - candidate_explained_or_demoted
+        - no_training_like_candidate_detected_in_covered_live_segment
+        - inconclusive_due_to_missingness
+      max_confidence: high
+      statement: "Final route for each monitored scope/window segment, with warning height, caveats, suppressor state, and missingness."
+    missing_data_behavior: "Missingness is surfaced as caveat or final inconclusive route; never as negative evidence."
+    cannot_conclude:
+      - binary_training_truth
+      - no_training_from_missing_B
+      - cleared_C_from_absent_C
+    calibration_defaults:
+      - name: min_final_routing_window_coverage_fraction
+        value: 0.75
+        unit: fraction
+        evidence_status: calibration_default
+        source_refs: [S07, S08, S09, S18, S23, S26, S28, S29, S31, S35, S40, S41]
+        rationale: "Final routing should cover most of the candidate segment, with lower confidence or inconclusive output below this value."
+        counterevidence_or_failure_modes:
+          - "short high-confidence subwindows can be obscured by broad audit windows"
+        calibration_note: "Report subwindow-level final routes and tune by source coverage."

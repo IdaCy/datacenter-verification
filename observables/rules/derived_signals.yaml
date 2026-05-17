@@ -59,6 +59,9 @@ derived_signals:
       - cap_clock_power_factor
       - capacity_upper_bound_operations
       - uncertainty_margin
+      - unit_normalized
+      - hidden_or_unmonitored_capacity_possible
+      - missing_required_peak_rate
     output_unit: operations
     normalization: "Operations per segment are summed over SKU and normalized only by the window duration already represented in the integral."
     formula: |
@@ -78,6 +81,9 @@ derived_signals:
       - "Missing source-backed peak rate prevents a numeric upper bound for that SKU/mode."
       - "Missing cap, clock, or throttle data defaults to factor 1.0 for conservative upper-bound calculations, but the missing channel is recorded."
       - "Missing installation or electrical-service data prevents strong negative certification for physical sites."
+      - "If operation units, precision/mode, or source peak-rate units cannot be normalized, set unit_normalized = false and block rule-out."
+      - "If required peak-rate inputs are absent, set missing_required_peak_rate = true and block rule-out."
+      - "If monitored-boundary records leave plausible hidden or out-of-scope capacity, set hidden_or_unmonitored_capacity_possible = true and block rule-out."
     minimum_coverage_requirement:
       feature: telemetry_coverage_fraction.primary_channel_min
       value: 0.90
@@ -107,11 +113,8 @@ derived_signals:
       - "Capacity above a policy threshold only means a threshold-scale run was possible."
       - "Cloud quota, reservation, and billing records may use provider-specific aggregation and scope."
     used_by_rules:
-      - cap_capacity_upper_bound_flop
-      - cap_negative_certification_inputs
-      - claimed_compute_above_cap_adjusted_capacity
-      - achieved_ops_training_candidate
-      - activity_before_installation_or_electrical_service
+      - achieved_ops_above_peak_capacity_conflict
+      - activity_before_installation_or_service_conflict
     source_refs: [S01, S03, S04, S05, S06, S07, S08, S09, S23, S24, S26, S35, S40, S41]
 
   - id: cap_clock_power_factor
@@ -175,10 +178,7 @@ derived_signals:
       - "Power/clock caps are hardware constraints, not workload identity."
       - "P-state and throttle semantics vary by vendor and driver."
     used_by_rules:
-      - cap_power_clock_limit_adjustment
-      - cap_capacity_upper_bound_flop
-      - high_activity_during_health_or_throttle_degraded_state
-      - power_thermal_physical_support
+      - high_activity_during_degraded_or_throttled_state_conflict
     source_refs: [S07, S08, S09, S40, S41]
 
   - id: available_accelerator_fraction
@@ -244,11 +244,8 @@ derived_signals:
       - "Reservations indicate availability, not activity."
       - "Logical partition count may not map linearly to training throughput."
     used_by_rules:
-      - cap_partition_adjustment
-      - cap_health_degraded_device_adjustment
-      - cap_capacity_upper_bound_flop
-      - high_activity_during_health_or_throttle_degraded_state
-      - activity_before_installation_or_electrical_service
+      - activity_before_installation_or_service_conflict
+      - high_activity_during_degraded_or_throttled_state_conflict
     source_refs: [S10, S18, S19, S20, S23]
 
   - id: largest_usable_topology_domain
@@ -295,10 +292,7 @@ derived_signals:
       - "A coherent low-latency domain supports possibility, not workload identity."
       - "HPC and benchmark jobs also prefer coherent low-latency domains."
     used_by_rules:
-      - cap_topology_domain_constraint
-      - collective_cadence_training
-      - topology_training_context
-      - route_or_topology_change_during_candidate_window
+      - route_or_topology_change_during_sparse_candidate
     source_refs: [S11, S15, S16, S17, S25, S42, S43]
 
   - id: stable_participant_set
@@ -349,10 +343,7 @@ derived_signals:
       - "HPC, NCCL tests, and burn-in can have very stable participant sets."
       - "Elastic or preempted training can have lower stability."
     used_by_rules:
-      - collective_cadence_training
-      - sustained_ml_compute_nonserving
-      - high_fabric_activity_no_job_mapping
-      - topology_training_context
+      - fabric_without_job_or_topology_mapping_conflict
     source_refs: [S12, S13, S14, S16, S17, S18, S20, S42, S43]
 
   - id: sustained_accelerator_activity_window
@@ -405,16 +396,7 @@ derived_signals:
     known_false_positives_or_limits:
       - "Inference, HPC, synthetic data generation, and benchmarks can have high accelerator activity."
       - "Communication-bound or input-bound training can have lower activity scores."
-    used_by_rules:
-      - collective_cadence_training
-      - checkpoint_training_signature
-      - sustained_ml_compute_nonserving
-      - achieved_ops_training_candidate
-      - high_power_low_gpu_activity
-      - checkpoint_writes_no_accelerator_activity
-      - high_gpu_activity_no_allocation
-      - high_activity_during_health_or_throttle_degraded_state
-      - memory_bandwidth_activity_support
+    used_by_rules: []
     source_refs: [S07, S08, S36, S37, S38, S39]
 
   - id: achieved_operation_integral
@@ -436,7 +418,7 @@ derived_signals:
       - coverage_fraction
       - operation_count_to_capacity_upper_bound_ratio
       - training_identity_support_score
-      - operation_unit_mismatch
+      - operation_unit_or_precision_mismatch
       - counter_reset_unresolved
       - confidence
     output_unit: operations
@@ -469,9 +451,7 @@ derived_signals:
       - "Large achieved compute is not workload identity."
       - "Advertised peak must not be used as a positive lower bound unless explicitly marked as a proxy assumption."
     used_by_rules:
-      - achieved_ops_training_candidate
-      - sustained_ml_compute_nonserving
-      - claimed_compute_above_cap_adjusted_capacity
+      - achieved_ops_above_peak_capacity_conflict
     source_refs: [S01, S03, S07, S08, S36, S37, S38, S39]
 
   - id: collective_cadence_score
@@ -551,10 +531,7 @@ derived_signals:
       - "NCCL tests, MPI/HPC workloads, and distributed inference can produce repeated collectives."
       - "Storage traffic can appear bursty on shared fabrics if not scope-separated."
     used_by_rules:
-      - collective_cadence_training
-      - benchmark_like_collective_counterevidence
-      - hpc_mpi_collective_alternative
-      - high_fabric_activity_no_job_mapping
+      - fabric_without_job_or_topology_mapping_conflict
     source_refs: [S11, S12, S13, S14, S15, S16, S17, S25, S42, S43]
 
   - id: fabric_compute_time_alignment
@@ -601,12 +578,7 @@ derived_signals:
     known_false_positives_or_limits:
       - "HPC/MPI and inference can align fabric and accelerator activity."
       - "Asynchronous prefetching or checkpoint phases can reduce overlap for real training."
-    used_by_rules:
-      - collective_cadence_training
-      - sustained_ml_compute_nonserving
-      - high_fabric_activity_no_job_mapping
-      - benchmark_like_collective_counterevidence
-      - hpc_mpi_collective_alternative
+    used_by_rules: []
     source_refs: [S11, S12, S13, S14, S15, S16, S17]
 
   - id: checkpoint_periodicity_score
@@ -651,7 +623,7 @@ derived_signals:
       single_write_only = write_burst_count == 1
     missing_data_behavior:
       - "Without storage operation labels, keep score but mark counterevidence coverage missing."
-      - "Without activity coverage, route to `checkpoint_writes_no_accelerator_activity` rather than positive evidence."
+      - "Without activity coverage, route to `checkpoint_writes_without_activity_conflict` rather than positive evidence."
     minimum_coverage_requirement:
       value: 0.80
       unit: fraction
@@ -671,11 +643,7 @@ derived_signals:
       - "Periodic backups, snapshots, ETL output, replication, and generated data can mimic checkpoint cadence."
       - "Manual or preemption-driven checkpoints can be irregular."
     used_by_rules:
-      - checkpoint_training_signature
-      - collective_cadence_training
-      - checkpoint_writes_no_accelerator_activity
-      - benchmark_like_collective_counterevidence
-      - lifecycle_preemption_context
+      - checkpoint_writes_without_activity_conflict
     source_refs: [S31, S32, S33, S34, S35, S45, S46, S47]
 
   - id: checkpoint_size_consistency
@@ -730,9 +698,7 @@ derived_signals:
       - "Backups and snapshots can have consistent sizes."
       - "Adapter training, optimizer offload, sharded checkpoints, and deduplication can break simple size expectations."
     used_by_rules:
-      - checkpoint_training_signature
-      - memory_residency_support
-      - storage_rebuild_backup_explanation
+      - checkpoint_writes_without_activity_conflict
     source_refs: [S31, S32, S33, S45, S46, S47]
 
   - id: non_serving_score
@@ -786,13 +752,7 @@ derived_signals:
     known_false_positives_or_limits:
       - "Batch inference can have low serving score."
       - "Training data fetches and artifact exports can look like external serving without operation labels."
-    used_by_rules:
-      - collective_cadence_training
-      - sustained_ml_compute_nonserving
-      - achieved_ops_training_candidate
-      - serving_heavy_network_counterevidence
-      - storage_staging_support
-      - hpc_mpi_collective_alternative
+    used_by_rules: []
     source_refs: [S27, S28, S29, S30, S34]
 
   - id: storage_staging_window
@@ -842,10 +802,7 @@ derived_signals:
       - "Replication, backup, migration, ETL, and restore are common non-training explanations."
       - "Dataset staging supports training only when joined with core activity evidence."
     used_by_rules:
-      - storage_staging_support
-      - internal_data_movement_support
-      - high_fabric_activity_storage_or_backup_explanation
-      - storage_rebuild_backup_explanation
+      - fabric_or_storage_activity_explained_by_storage_operation
     source_refs: [S31, S32, S33, S34, S35]
 
   - id: telemetry_coverage_fraction
@@ -895,14 +852,72 @@ derived_signals:
       - "Provider logs can be sampled, aggregated, delayed, or best-effort."
       - "Billing and audit logs may not match telemetry windows exactly."
     used_by_rules:
-      - cap_negative_certification_inputs
-      - telemetry_gap_during_candidate_training_window
-      - collective_cadence_training
-      - checkpoint_training_signature
-      - sustained_ml_compute_nonserving
-      - achieved_ops_training_candidate
-      - cap_cloud_capacity_constraint
+      - high_power_low_or_missing_activity_conflict
+      - fabric_without_job_or_topology_mapping_conflict
+      - checkpoint_writes_without_activity_conflict
+      - telemetry_gap_during_sparse_candidate_window
+      - route_or_topology_change_during_sparse_candidate
+      - high_activity_during_degraded_or_throttled_state_conflict
     source_refs: [S07, S08, S27, S28, S29, S30, S31, S35, S36, S37, S38, S39]
+
+  - id: negative_screen_required_coverage_state
+    input_features: []
+    input_rule_outputs:
+      - capacity_possible_for_scope
+      - capacity_limited_but_not_ruled_out
+      - capacity_unknown_due_to_missing_inputs
+      - accelerator_activity_run_existence
+      - large_compute_scale
+      - fabric_parameter_update_like
+      - storage_checkpoint_state_like
+      - non_serving_workload_shape
+      - telemetry_missingness_conflict
+    input_windows: "Live capacity segments where B produced no training-like candidate and the algorithm must decide whether absence of evidence is trustworthy."
+    output_type: object
+    output_fields:
+      - monitored_scope
+      - start_time
+      - end_time
+      - required_channels
+      - covered_channels
+      - missing_channels
+      - primary_activity_coverage_fraction
+      - achieved_ops_coverage_fraction
+      - identity_shape_coverage_fraction
+      - suppressor_channel_coverage_fraction
+      - scope_mapping_coverage_fraction
+      - clock_alignment_confidence
+      - negative_screen_trustworthy
+      - decision_blocking_missingness
+    output_unit: mixed_object
+    normalization: "Coverage is inherited from telemetry_coverage_fraction and clock_aligned_overlap_window for the same monitored scope and capacity-live segment."
+    formula: |
+      For each capacity-live segment with no B candidate label, identify the
+      channels required to trust the negative screen: accelerator activity or
+      achieved-operation telemetry, expected fabric/checkpoint identity-shape
+      channels for the monitored scope, allocation/running/billing or scope
+      mapping channels, and clock alignment. Set negative_screen_trustworthy =
+      true only when required primary coverage, identity-shape coverage, scope
+      mapping coverage, and clock alignment meet the consuming aggregation
+      rule's defaults. Otherwise set decision_blocking_missingness = true and
+      list missing_channels.
+    missing_data_behavior:
+      - "Missing primary activity coverage makes the no-candidate result inconclusive."
+      - "Missing expected identity-shape coverage prevents a clean negative screen for that channel."
+      - "Unknown scope mapping or low clock confidence prevents a clean negative screen."
+    minimum_coverage_requirement:
+      value: 0.75
+      unit: fraction
+      evidence_status: calibration_default
+      rationale: "Reuses the candidate/final-routing coverage default for deciding whether no B evidence is trustworthy."
+      calibration_note: "Replace with source-specific coverage requirements for negative screening."
+    known_false_positives_or_limits:
+      - "A covered negative screen is not proof that no training occurred outside the monitored scope."
+      - "Unexpected telemetry configuration can make a channel seem covered when it is not collecting the relevant assets."
+    used_by_rules:
+      - no_training_candidate_coverage_gate
+      - final_algorithm_claim_routing
+    source_refs: [S07, S08, S09, S18, S23, S26, S28, S29, S31, S35, S36, S37, S38, S39]
 
   - id: clock_aligned_overlap_window
     input_features:
@@ -949,9 +964,430 @@ derived_signals:
       - "Coarse aggregation can create apparent overlap between unrelated events."
       - "Clock drift can hide true ordering around checkpoint and fabric bursts."
     used_by_rules:
-      - collective_cadence_training
-      - checkpoint_training_signature
-      - high_power_low_gpu_activity
-      - route_or_topology_change_during_candidate_window
-      - cap_capacity_upper_bound_flop
+      - high_power_low_or_missing_activity_conflict
+      - route_or_topology_change_during_sparse_candidate
     source_refs: [S18, S21, S22, S27, S28, S29, S30, S31, S42, S43]
+
+  - id: capacity_segment_window
+    input_features:
+      - accelerator_count_by_family_sku
+      - advertised_peak_rate_by_precision
+      - accelerator_partitioning_intervals
+      - capacity_reservation_intervals
+      - quota_limit_intervals
+      - compute_running_intervals
+      - accelerator_compute_billing_usage_intervals
+      - maintenance_operation_intervals
+      - accelerator_health_error_state
+      - accelerator_throttle_state
+      - accelerator_performance_limit_state
+      - electrical_service_status_intervals
+      - utility_interconnection_status_intervals
+      - asset_receiving_installation_events
+      - topology_change_events
+    input_rule_outputs:
+      - capacity_count_or_shape
+      - capacity_peak_rate
+      - capacity_availability
+      - capacity_power_service
+      - capacity_topology
+      - capacity_policy_scale
+    input_windows: "Selected audit window split at every capacity, availability, service, topology, route, and clock-alignment boundary that changes capacity interpretation."
+    output_type: object
+    output_fields:
+      - monitored_scope
+      - start_time
+      - end_time
+      - segment_reason
+      - capacity_categories_present
+      - capacity_categories_missing
+      - capacity_coverage_fraction
+      - clock_alignment_confidence
+      - hidden_or_out_of_scope_capacity_possible
+    output_unit: mixed_object
+    normalization: "Segments are half-open intervals and inherit source coverage from telemetry_coverage_fraction for capacity-relevant channels."
+    formula: |
+      Start with the operator-selected audit window. Split it at inventory,
+      SKU/peak-rate, partition, quota, reservation, running, billing,
+      maintenance, health, throttle, service, installation, topology, route,
+      and clock-correction boundaries. For each segment, attach sparse
+      capacity categories whose output windows overlap the segment and compute
+      capacity_coverage_fraction from required capacity channels.
+    missing_data_behavior:
+      - "Missing required count, peak-rate, service, or scope mapping keeps the segment live as capacity_unknown_due_to_missing_inputs."
+      - "Hidden or out-of-scope capacity prevents conservative rule-out."
+    minimum_coverage_requirement:
+      value: 0.90
+      unit: fraction
+      evidence_status: calibration_default
+      rationale: "Capacity rule-out requires high coverage of the segment-defining inputs."
+      calibration_note: "Replace with source-specific inventory, provider, and facility-record completeness."
+    known_false_positives_or_limits:
+      - "Provider reservations, billing, and flow records can lag real capacity state."
+      - "Topology changes can alter visibility without changing actual capacity."
+    used_by_rules:
+      - capacity_gate_segment_ruleout
+      - capacity_gate_live_segment_classification
+      - discrepancy_targeted_escalation
+      - final_algorithm_claim_routing
+    source_refs: [S07, S08, S09, S18, S23, S24, S26, S35, S40, S41]
+
+  - id: rule_output_join_window
+    input_features: []
+    input_rule_outputs:
+      - large_compute_scale
+      - accelerator_activity_run_existence
+      - fabric_parameter_update_like
+      - storage_checkpoint_state_like
+      - non_serving_workload_shape
+      - physical_activity_support
+      - large_model_context_support
+      - data_lifecycle_support
+      - topology_context_support
+      - lifecycle_operational_context
+      - serving_counterevidence
+      - storage_operation_explanation
+      - benchmark_hpc_alternative
+      - activity_attribution_conflict
+      - capacity_claim_conflict
+      - telemetry_missingness_conflict
+    input_windows: "Time-bounded outputs emitted by sparse rule files, joined by monitored scope and mapped child scopes."
+    output_type: object
+    output_fields:
+      - monitored_scope
+      - start_time
+      - end_time
+      - joined_categories
+      - independent_category_count
+      - overlap_fraction
+      - adjacency_or_overlap_fraction
+      - max_adjacency_seconds
+      - source_rule_ids
+      - missing_expected_categories
+      - join_confidence
+    output_unit: mixed_object
+    normalization: "Overlap is measured against the candidate-driving category window; adjacency is counted only inside rule-specific allowed lag windows."
+    formula: |
+      Join sparse outputs whose scope is identical or mapped to a common
+      parent and whose windows overlap or are adjacent within the consuming
+      aggregation rule's allowed lag. Count independence by category family,
+      not by repeated rules from the same raw feature family.
+    missing_data_behavior:
+      - "Missing expected categories are surfaced in missing_expected_categories."
+      - "Missing suppressor categories do not count as cleared suppressors."
+    minimum_coverage_requirement:
+      value: 0.75
+      unit: fraction
+      evidence_status: calibration_default
+      rationale: "Joined sparse outputs need substantial temporal overlap before promotion."
+      calibration_note: "Tune separately for activity/fabric, checkpoint/storage, and support contexts."
+    known_false_positives_or_limits:
+      - "Adjacent events can be unrelated when audit windows are broad."
+      - "Multiple rules over the same raw channel are not independent evidence."
+    used_by_rules:
+      - large_compute_candidate_routing
+      - distributed_training_like_candidate_promotion
+      - checkpoint_training_like_candidate_promotion
+      - support_context_aggregation
+      - suppressor_and_explanation_aggregation
+      - discrepancy_targeted_escalation
+    source_refs: [S11, S12, S13, S14, S18, S23, S26, S28, S29, S31, S45, S46, S47]
+
+  - id: aggregation_candidate_seed_window
+    input_features: []
+    input_rule_outputs:
+      - capacity_possible_for_scope
+      - capacity_limited_but_not_ruled_out
+      - capacity_unknown_due_to_missing_inputs
+      - large_compute_scale
+      - accelerator_activity_run_existence
+      - fabric_parameter_update_like
+      - storage_checkpoint_state_like
+      - non_serving_workload_shape
+    input_windows: "Pre-B candidate seed windows created by live capacity segments plus aligned sparse activity, large-compute, fabric, checkpoint, or non-serving categories."
+    output_type: object
+    output_fields:
+      - monitored_scope
+      - start_time
+      - end_time
+      - capacity_stage_result
+      - candidate_seed_labels
+      - core_identity_categories
+      - support_categories
+      - suppressor_categories_expected
+      - discrepancy_categories_expected
+      - coverage_fraction
+      - candidate_window_score
+    output_unit: mixed_object
+    normalization: "Window score is normalized to category independence, temporal alignment, and coverage rather than raw bytes or raw utilization."
+    formula: |
+      For each live capacity segment, create candidate windows from aligned
+      activity plus identity-shape outputs. Extend windows only by the
+      consuming rule's allowed adjacency for checkpoint, support, suppressor, or
+      source-delay behavior. Preserve capacity_ruled_out_for_scope segments as
+      final rule-out windows with no B/C candidate window.
+    missing_data_behavior:
+      - "Capacity-unknown segments remain live."
+      - "Missing primary B or suppressor categories are attached as decision-blocking caveats."
+    minimum_coverage_requirement:
+      value: 0.75
+      unit: fraction
+      evidence_status: calibration_default
+      rationale: "Candidate routing requires most primary channels to cover the candidate window."
+      calibration_note: "Replace with known source coverage and candidate-window policy."
+    known_false_positives_or_limits:
+      - "Large audit windows can contain multiple unrelated jobs."
+      - "Candidate windows inherit ambiguity from sparse rule outputs."
+    used_by_rules:
+      - large_compute_candidate_routing
+      - distributed_training_like_candidate_promotion
+      - checkpoint_training_like_candidate_promotion
+      - sparse_large_compute_training_like_candidate_promotion
+    source_refs: [S07, S08, S11, S12, S13, S14, S18, S28, S29, S31, S45, S46, S47]
+
+  - id: aggregation_candidate_review_window
+    input_features: []
+    input_rule_outputs:
+      - large_compute_candidate
+      - distributed_training_like_candidate
+      - checkpoint_training_like_candidate
+      - sparse_large_compute_training_like_candidate
+      - candidate_context_strengthened
+      - candidate_context_weak_only
+      - candidate_requires_manual_review
+      - large_compute_capacity_conflict
+      - large_compute_training_identity_unresolved
+    input_windows: "C-stage review windows created from candidate seed windows after B promotion and support-context aggregation, before C suppressor and discrepancy adjudication."
+    output_type: object
+    output_fields:
+      - monitored_scope
+      - start_time
+      - end_time
+      - capacity_stage_result
+      - candidate_labels
+      - support_labels
+      - expected_suppressor_categories
+      - expected_discrepancy_categories
+      - coverage_fraction
+      - review_ready
+    output_unit: mixed_object
+    normalization: "Review windows preserve the seed window identity and attach B/support labels without requiring C outputs."
+    formula: |
+      Start from aggregation_candidate_seed_window and attach B candidate labels
+      plus support context that overlaps or is adjacent within the relevant
+      rule-specific windows. This signal is consumed by C-stage suppressor,
+      explanation, and discrepancy rules. It does not include C adjudication
+      outputs.
+    missing_data_behavior:
+      - "Missing expected suppressor or discrepancy channels are retained as review requirements."
+      - "Rule-out segments do not create review windows."
+    minimum_coverage_requirement:
+      value: 0.75
+      unit: fraction
+      evidence_status: calibration_default
+      rationale: "C review needs most primary candidate channels to identify which checks are relevant."
+      calibration_note: "Replace with known source coverage and review-routing policy."
+    known_false_positives_or_limits:
+      - "Review windows inherit ambiguity from sparse rule outputs."
+      - "B candidate labels can be sparse and should route review without implying final warning height."
+    used_by_rules:
+      - support_context_aggregation
+      - suppressor_and_explanation_aggregation
+      - discrepancy_targeted_escalation
+    source_refs: [S07, S08, S11, S12, S13, S14, S18, S28, S29, S31, S45, S46, S47]
+
+  - id: aggregation_candidate_final_window
+    input_features: []
+    input_rule_outputs:
+      - large_compute_candidate
+      - distributed_training_like_candidate
+      - checkpoint_training_like_candidate
+      - sparse_large_compute_training_like_candidate
+      - candidate_context_strengthened
+      - candidate_context_weak_only
+      - candidate_requires_manual_review
+      - candidate_explained_by_serving
+      - candidate_explained_by_storage_operation
+      - candidate_benchmark_like
+      - candidate_hpc_mpi_alternative
+      - candidate_demoted_by_unresolved_suppressor
+      - negative_screen_coverage_sufficient
+      - negative_screen_blocked_by_missingness
+      - integrity_review_required
+      - inconclusive_due_to_missingness
+    input_windows: "Final-routing windows created after C suppressor, explanation, discrepancy, and missingness adjudication."
+    output_type: object
+    output_fields:
+      - monitored_scope
+      - start_time
+      - end_time
+      - capacity_stage_result
+      - candidate_labels
+      - support_labels
+      - suppressor_resolution_status
+      - discrepancy_resolution_status
+      - coverage_fraction
+      - final_routing_ready
+    output_unit: mixed_object
+    normalization: "Final windows preserve the review window identity and attach C outcomes without changing raw-feature interpretation."
+    formula: |
+      Start from aggregation_candidate_review_window and attach suppressor
+      resolution, discrepancy escalation, explanation, and missingness outputs
+      that overlap or are adjacent within their rule-specific allowed windows.
+      This signal is consumed by final routing only.
+    missing_data_behavior:
+      - "Missing suppressor or discrepancy results are retained as unresolved caveats."
+      - "Rule-out segments do not create post-B/C candidate windows."
+    minimum_coverage_requirement:
+      value: 0.75
+      unit: fraction
+      evidence_status: calibration_default
+      rationale: "Final candidate routing requires most primary channels to cover the candidate window."
+      calibration_note: "Replace with known source coverage and final-routing policy."
+    known_false_positives_or_limits:
+      - "Post-B/C windows inherit ambiguity from sparse rule outputs."
+      - "Multiple B labels can refer to one underlying job and should not be double-counted as independent raw evidence."
+    used_by_rules:
+      - final_algorithm_claim_routing
+    source_refs: [S07, S08, S11, S12, S13, S14, S18, S28, S29, S31, S45, S46, S47]
+
+  - id: suppression_resolution_state
+    input_features: []
+    input_rule_outputs:
+      - serving_counterevidence
+      - storage_operation_explanation
+      - benchmark_hpc_alternative
+      - storage_activity_conflict
+      - topology_route_conflict
+      - suppressors_alternative_explanations
+      - candidate_explained_by_serving
+      - candidate_explained_by_storage_operation
+      - candidate_benchmark_like
+      - candidate_hpc_mpi_alternative
+      - candidate_demoted_by_unresolved_suppressor
+      - inconclusive_due_to_missingness
+    input_windows: "Suppressor, explanation, and missingness outputs aligned to aggregation_candidate_review_window and carried into aggregation_candidate_final_window."
+    output_type: object
+    output_fields:
+      - checked_suppressor_categories
+      - missing_suppressor_categories
+      - resolved_suppressor_categories
+      - unresolved_suppressor_categories
+      - strong_unresolved_suppressor_count
+      - suppressor_overlap_fraction
+      - explanation_strength
+      - suppressor_resolution_status
+    output_unit: mixed_object
+    normalization: "Suppressor strength is normalized by overlap with the candidate-driving activity/identity window and by source coverage."
+    formula: |
+      For each expected suppressor category, classify state as not_expected,
+      checked_absent_with_coverage, present_explaining, present_unresolved, or
+      missing_channel. Strong unresolved suppressors are present_unresolved
+      outputs with high severity/strength or missing channels required by a
+      medium/high promotion path.
+    missing_data_behavior:
+      - "Missing expected suppressor channels produce missing_channel and block high warning."
+      - "Checked absence is allowed only when coverage is explicit for the same scope/window."
+    minimum_coverage_requirement:
+      value: 0.75
+      unit: fraction
+      evidence_status: source_informed
+      rationale: "Suppressor absence needs source coverage; otherwise it is missingness."
+      calibration_note: "Replace with per-suppressor source coverage and delay behavior."
+    known_false_positives_or_limits:
+      - "Broad operational explanations can over-demote true candidates."
+      - "Sparse suppressor logs can miss serving, storage, benchmark, or HPC alternatives."
+    used_by_rules:
+      - distributed_training_like_candidate_promotion
+      - checkpoint_training_like_candidate_promotion
+      - sparse_large_compute_training_like_candidate_promotion
+      - suppressor_and_explanation_aggregation
+      - discrepancy_targeted_escalation
+      - final_algorithm_claim_routing
+    source_refs: [S18, S21, S22, S28, S29, S31, S32, S33, S45, S46, S47]
+
+  - id: warning_height_score
+    input_features: []
+    input_rule_outputs:
+      - distributed_training_like_candidate
+      - checkpoint_training_like_candidate
+      - sparse_large_compute_training_like_candidate
+      - candidate_context_strengthened
+      - candidate_context_weak_only
+      - candidate_demoted_by_unresolved_suppressor
+      - integrity_review_required
+      - inconclusive_due_to_missingness
+    input_windows: "Aggregation candidate windows after B promotion, support context, suppressor resolution, and targeted C review."
+    output_type: object
+    output_fields:
+      - warning_height
+      - warning_score
+      - independent_identity_category_count
+      - support_category_count
+      - primary_channel_coverage_fraction
+      - suppressors_checked
+      - unresolved_strong_suppressor_count
+      - unresolved_high_or_critical_C_count
+      - caveats
+    output_unit: mixed_object
+    score_range: [0.0, 1.0]
+    normalization: "Scores count independent categories and decision state; raw compute, fabric bytes, storage bytes, and power are not direct score terms."
+    formula: |
+      Base score:
+        +0.35 for capacity live plus accelerator activity.
+        +0.25 for one aligned core identity-shape category.
+        +0.15 for a second independent identity/support category.
+        +0.10 for large-compute scale when identity evidence exists.
+        +0.10 for checked suppressors.
+        +0.05 for targeted C clear or non-blocking.
+      Subtract 0.25 for unresolved suppressor missingness and 0.35 for high or
+      critical unresolved C findings. Clamp to [0, 1].
+      warning_height = none when no core B candidate exists; weak when score is
+      >= 0.35; medium when score is >= 0.60 with suppressors checked or
+      explicitly weak; high when score is >= 0.80, at least two independent
+      aligned categories exist, suppressors are checked, and no unresolved
+      high/critical C finding exists.
+    missing_data_behavior:
+      - "Missing suppressor or primary channels cap warning_height at weak unless explicitly resolved."
+      - "Missing capacity inputs keep the segment live but add caveats."
+    minimum_coverage_requirement:
+      value: 0.75
+      unit: fraction
+      evidence_status: calibration_default
+      rationale: "Warning-height routing should not exceed weak when most primary channels are absent."
+      calibration_note: "Calibrate with known training and non-training workload distributions."
+    default_parameters:
+      - name: weak_warning_score
+        value: 0.35
+        unit: score_0_to_1
+        evidence_status: project_assumption
+        source_refs: [S07, S08, S11, S12, S13, S14, S16, S17, S45, S46, S47]
+        rationale: "Executable score threshold for sparse candidate routing; low enough to preserve weak candidates."
+        counterevidence_or_failure_modes: ["can route benign sparse activity to review"]
+        calibration_note: "Tune against local labeled workload windows."
+      - name: medium_warning_score
+        value: 0.60
+        unit: score_0_to_1
+        evidence_status: project_assumption
+        source_refs: [S07, S08, S11, S12, S13, S14, S16, S17, S45, S46, S47]
+        rationale: "Requires aligned activity plus identity and some suppressor/support resolution."
+        counterevidence_or_failure_modes: ["HPC, benchmarks, and serving can still reach medium without enough suppressor data"]
+        calibration_note: "Tune against local false-positive classes."
+      - name: high_warning_score
+        value: 0.80
+        unit: score_0_to_1
+        evidence_status: project_assumption
+        source_refs: [S07, S08, S11, S12, S13, S14, S16, S17, S45, S46, S47]
+        rationale: "High warning requires multiple independent aligned categories and cleared suppressors."
+        counterevidence_or_failure_modes: ["multi-channel non-training jobs can still mimic training"]
+        calibration_note: "Require site validation before operational high-confidence use."
+    known_false_positives_or_limits:
+      - "The score is routing logic, not a probability of training."
+      - "High warning is still a warning height with caveats, not semantic certainty."
+    used_by_rules:
+      - distributed_training_like_candidate_promotion
+      - checkpoint_training_like_candidate_promotion
+      - sparse_large_compute_training_like_candidate_promotion
+      - support_context_aggregation
+      - final_algorithm_claim_routing
+    source_refs: [S07, S08, S11, S12, S13, S14, S16, S17, S31, S32, S33, S45, S46, S47]

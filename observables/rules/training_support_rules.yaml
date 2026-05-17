@@ -1,944 +1,936 @@
 schema_version: "0.1"
 created: "2026-05-16"
 source_inventory: observables/observables.yaml
-status: study_algorithm_rule_spec
+status: sparse_first_algorithm_rule_spec
 
-support_policy:
-  primary_evidence_policy: >
-    Rules in this file may strengthen, weaken, explain, or route review of a
-    core training finding. They should not by themselves produce a strong
-    training evidence label.
-  output_labels:
-    - strengthens_core_training_evidence
-    - weakens_core_training_evidence
-    - explains_candidate_activity
-    - requires_review
+purpose: >
+  Sparse support, counterevidence, and explanation rules for cases where only a
+  small number of non-core raw features are available. These rules can route
+  review, modestly adjust confidence, or explain candidate activity, but they do
+  not create a positive training label by themselves.
+
+scope_policy:
+  trusted_local_inputs: "Only raw feature IDs from observables/observables.yaml are used as inputs."
+  relationship_to_aggregation_rules: >
+    This file emits weak support, counterevidence, and explanation screens for
+    the public aggregation layer. Support screens route, strengthen, or explain
+    candidates but do not create training identity by themselves.
+  modest_effect_policy: >
+    Single-feature support has score_effect or routing_effect capped to weak or
+    review-only. Pair rules can have larger but still non-primary effects when
+    time overlap and coverage are established.
+
+support_categories:
+  - id: physical_activity_support
+    name: Power, energy, thermal, and cooling support
+    algorithm_treatment: "Use as physical consistency support or physical anomaly routing, not workload identity."
+    rule_ids:
+      - physical_power_load_support_screen
+      - cooling_thermal_response_support_screen
+      - physical_activity_pair_support_screen
+  - id: large_model_context_support
+    name: Large-model memory context
+    algorithm_treatment: "Use to strengthen large-model context only after core activity exists."
+    rule_ids:
+      - memory_residency_context_screen
+      - memory_capacity_residency_pair_screen
+  - id: data_lifecycle_support
+    name: Data staging, cache, and copy lifecycle
+    algorithm_treatment: "Use as weak dataset or artifact movement context; check explicit storage-operation explanations first."
+    rule_ids:
+      - storage_staging_support_screen
+      - object_copy_data_movement_support_screen
+      - cache_epoch_context_screen
+  - id: topology_context_support
+    name: Topology and distributed-work context
+    algorithm_treatment: "Use as distributed-work plausibility context, not fabric activity."
+    rule_ids:
+      - topology_distributed_work_support_screen
+  - id: serving_counterevidence
+    name: Serving-like counterevidence
+    algorithm_treatment: "Use to weaken non-serving or training interpretations when aligned with activity."
+    rule_ids:
+      - serving_like_network_counterevidence_screen
+  - id: storage_operation_explanation
+    name: Storage operation explanations
+    algorithm_treatment: "Use to explain storage, WAN, or internal-flow bursts before treating them as checkpoint or collective evidence."
+    rule_ids:
+      - storage_operation_explanation_screen
+  - id: benchmark_hpc_alternative
+    name: Benchmark and HPC alternatives
+    algorithm_treatment: "Use to route fabric-heavy candidates to benchmark/HPC review before promotion."
+    rule_ids:
+      - benchmark_like_alternative_screen
+      - hpc_mpi_alternative_screen
+  - id: lifecycle_operational_context
+    name: Lifecycle, preemption, and maintenance context
+    algorithm_treatment: "Use to explain starts, restarts, gaps, fragmented activity, and checkpoint bursts."
+    rule_ids:
+      - lifecycle_restart_or_preemption_context_screen
+
+rule_category_membership:
+  membership_policy: >
+    Categories are evidentiary roles. Each sparse support rule has exactly one
+    primary category for default routing and may list additional categories for
+    scoring or suppressor checks.
+  rules:
+    - rule_id: physical_power_load_support_screen
+      primary_category: physical_activity_support
+      additional_categories: []
+    - rule_id: cooling_thermal_response_support_screen
+      primary_category: physical_activity_support
+      additional_categories: []
+    - rule_id: physical_activity_pair_support_screen
+      primary_category: physical_activity_support
+      additional_categories: []
+    - rule_id: memory_residency_context_screen
+      primary_category: large_model_context_support
+      additional_categories: []
+    - rule_id: memory_capacity_residency_pair_screen
+      primary_category: large_model_context_support
+      additional_categories: []
+    - rule_id: storage_staging_support_screen
+      primary_category: data_lifecycle_support
+      additional_categories: []
+    - rule_id: object_copy_data_movement_support_screen
+      primary_category: data_lifecycle_support
+      additional_categories: [storage_operation_explanation]
+    - rule_id: cache_epoch_context_screen
+      primary_category: data_lifecycle_support
+      additional_categories: []
+    - rule_id: topology_distributed_work_support_screen
+      primary_category: topology_context_support
+      additional_categories: []
+    - rule_id: serving_like_network_counterevidence_screen
+      primary_category: serving_counterevidence
+      additional_categories: []
+    - rule_id: storage_operation_explanation_screen
+      primary_category: storage_operation_explanation
+      additional_categories: [data_lifecycle_support]
+    - rule_id: benchmark_like_alternative_screen
+      primary_category: benchmark_hpc_alternative
+      additional_categories: []
+    - rule_id: hpc_mpi_alternative_screen
+      primary_category: benchmark_hpc_alternative
+      additional_categories: [topology_context_support]
+    - rule_id: lifecycle_restart_or_preemption_context_screen
+      primary_category: lifecycle_operational_context
+      additional_categories: [storage_operation_explanation]
 
 training_support_rules:
-  - id: memory_residency_support
-    purpose: supportive_training_context
-    required_features:
-      - hbm_or_device_memory_used
-    optional_features:
-      - memory_capacity_bytes
-      - allocated_accelerator_count_by_sku
-      - tensor_matrix_mxu_neuron_or_engine_active_fraction
-      - storage_write_operation_bytes
-      - object_storage_operation_counts
-    derived_signals:
-      - checkpoint_size_consistency
-    time_alignment: "High memory residency must overlap allocation/activity windows to support a large-model hypothesis."
-    logic: >
-      Compare per-device memory used and high-water values with device capacity
-      and participant count. Treat high, changing residency with checkpoint or
-      tensor activity as supportive; treat static residency without activity as
-      possible serving or idle reservation.
+  - id: physical_power_load_support_screen
+    purpose: sparse_physical_activity_support
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [accelerator_device_power_energy]
+        - [server_system_input_power]
+        - [rack_pdu_it_power]
+        - [facility_or_room_it_power_rollup]
+    emitted_statement:
+      label: physical_activity_support_screen
+      category: physical_activity_support
+      max_confidence: screen
+      statement: "Power or energy telemetry shows material physical load in the monitored scope; workload identity is unresolved."
     trigger:
-      type: support_score_threshold_logic
-      evaluation_window: clock_aligned_overlap_window
-      portability: weak
-      source_refs: [S04, S05, S06, S07, S08, S09, S36, S37, S38, S39, S45, S46, S47]
+      type: one_feature_physical_load_logic
+      evaluation_window: physical_power_sample_window
+      conditions:
+        all:
+          - metric: baseline_subtracted_physical_load_score
+            op: ">="
+            value_ref: min_sparse_physical_load_score
+          - metric: physical_power_coverage_fraction
+            op: ">="
+            value_ref: min_sparse_physical_channel_coverage
+      calibration_defaults:
+        - name: min_sparse_physical_load_score
+          value: 0.50
+          unit: score_0_to_1
+          evidence_status: calibration_default
+          source_refs: [S07, S08, S09, S40, S41]
+          rationale: "A moderate normalized, baseline-subtracted physical load is useful sparse support, but it is not workload-specific."
+          counterevidence_or_failure_modes:
+            - "CPU, storage, network, mixed-tenant load, burn-in, or cooling faults can raise power"
+          calibration_note: "Replace with rack/device/facility baselines and known workload power distributions."
+        - name: min_sparse_physical_channel_coverage
+          value: 0.60
+          unit: fraction
+          evidence_status: source_informed
+          source_refs: [S07, S08, S09, S40, S41]
+          rationale: "Sparse support can emit at lower coverage than strong discrepancy rules but must still report coverage."
+          counterevidence_or_failure_modes:
+            - "BMS/DCIM sampling can be sparse or scope-mismatched"
+          calibration_note: "Replace with source-specific coverage and sampling intervals."
+    score_effect:
+      training_core_confidence_delta: 0
+      support_score_cap: 0.35
+      explanation_priority: low
+    routing_effect:
+      route_to: physical_consistency_join
+      missing_joins_to_report: [accelerator_activity, allocation_or_running, cooling_response]
+    false_positive_or_limitations:
+      - "Power alone cannot classify workload type."
+      - "Scope mapping determines whether power belongs to accelerator-bearing assets."
+    cannot_conclude: [training, accelerator_activity, achieved_compute]
+    source_refs: [S07, S08, S09, S40, S41]
+
+  - id: cooling_thermal_response_support_screen
+    purpose: sparse_thermal_or_cooling_support
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [accelerator_temperature_celsius]
+        - [inlet_outlet_air_or_coolant_temperature]
+        - [coolant_flow_rate]
+        - [coolant_pressure]
+        - [pump_speed_or_state]
+        - [valve_position_or_state]
+        - [cooling_alarm_state]
+        - [fan_speed_rpm_or_percent]
+        - [airflow_rate]
+        - [thermal_control_mode]
+        - [source_reported_airflow_state]
+        - [outdoor_air_temperature_celsius]
+        - [outdoor_humidity_percent]
+        - [hvac_control_mode]
+        - [economizer_state]
+        - [facility_temperature_setpoint_celsius]
+    emitted_statement:
+      label: thermal_or_cooling_context_screen
+      category: physical_activity_support
+      max_confidence: screen
+      statement: "Thermal or cooling telemetry provides physical context for load, cooling response, or alarms; it does not identify training."
+    trigger:
+      type: one_feature_cooling_thermal_logic
+      evaluation_window: thermal_or_cooling_sample_window
+      conditions:
+        any:
+          - metric: thermal_response_score
+            op: ">="
+            value_ref: min_thermal_response_score
+          - metric: cooling_alarm_active
+            op: "=="
+            value: true
+          - metric: cooling_control_change_score
+            op: ">="
+            value_ref: min_cooling_control_change_score
+      calibration_defaults:
+        - name: min_thermal_response_score
+          value: 0.50
+          unit: score_0_to_1
+          evidence_status: calibration_default
+          source_refs: [S40, S41]
+          rationale: "A normalized temperature, flow, fan, or cooling response can support physical-load review."
+          counterevidence_or_failure_modes:
+            - "ambient conditions, economizer state, fixed fan policy, or unrelated heat load can drive response"
+          calibration_note: "Calibrate by cooling design, ambient conditions, and telemetry lag."
+        - name: min_cooling_control_change_score
+          value: 0.50
+          unit: score_0_to_1
+          evidence_status: calibration_default
+          source_refs: [S40, S41]
+          rationale: "Control changes are weak context until joined to power or activity."
+          counterevidence_or_failure_modes:
+            - "control changes may be scheduled or ambient-driven"
+          calibration_note: "Replace with facility control-mode and setpoint change baselines."
+    score_effect:
+      training_core_confidence_delta: 0
+      support_score_cap: 0.25
+      explanation_priority: low
+    routing_effect:
+      route_to: physical_context_review
+      missing_joins_to_report: [power, accelerator_activity, maintenance]
+    false_positive_or_limitations:
+      - "Cooling response can lag or precede IT load depending on control mode."
+    cannot_conclude: [training, accelerator_activity]
+    source_refs: [S40, S41]
+
+  - id: physical_activity_pair_support_screen
+    purpose: sparse_physical_activity_pair_support
+    raw_feature_budget: 2
+    required_feature_sets:
+      any_one_of:
+        - [accelerator_device_power_energy, tensor_matrix_mxu_neuron_or_engine_active_fraction]
+        - [accelerator_device_power_energy, accelerator_busy_or_utilization_fraction]
+        - [rack_pdu_it_power, tensor_matrix_mxu_neuron_or_engine_active_fraction]
+        - [rack_pdu_it_power, accelerator_busy_or_utilization_fraction]
+        - [server_system_input_power, tensor_matrix_mxu_neuron_or_engine_active_fraction]
+        - [facility_or_room_it_power_rollup, tensor_matrix_mxu_neuron_or_engine_active_fraction]
+    emitted_statement:
+      label: physical_activity_support_screen
+      category: physical_activity_support
+      max_confidence: weak
+      statement: "Power or energy load overlaps accelerator activity, supporting that substantial accelerator-bearing infrastructure work occurred."
+    trigger:
+      type: two_feature_physical_activity_overlap_logic
+      evaluation_window: lag_adjusted_power_activity_window
+      conditions:
+        all:
+          - metric: baseline_subtracted_physical_load_score
+            op: ">="
+            value_ref: min_pair_physical_load_score
+          - metric: sparse_activity_score
+            op: ">="
+            value_ref: min_pair_activity_score
+          - metric: lag_adjusted_power_activity_overlap_fraction
+            op: ">="
+            value_ref: min_pair_power_activity_overlap
+      calibration_defaults:
+        - name: min_pair_physical_load_score
+          value: 0.55
+          unit: score_0_to_1
+          evidence_status: calibration_default
+          source_refs: [S07, S08, S09, S40, S41]
+          rationale: "Pair support should require slightly stronger physical load than a one-feature screen."
+          counterevidence_or_failure_modes:
+            - "mixed-tenant and non-accelerator loads can still overlap activity"
+          calibration_note: "Calibrate by mapped rack/device power baselines."
+        - name: min_pair_activity_score
+          value: 0.50
+          unit: score_0_to_1
+          evidence_status: calibration_default
+          source_refs: [S07, S08, S36, S37, S38, S39]
+          rationale: "Physical support should overlap material accelerator activity."
+          counterevidence_or_failure_modes:
+            - "serving, inference, HPC, benchmarks, and burn-in can pass"
+          calibration_note: "Replace with local activity-score distributions."
+        - name: min_pair_power_activity_overlap
+          value: 0.50
+          unit: fraction
+          evidence_status: calibration_default
+          source_refs: [S07, S08, S09, S40, S41]
+          rationale: "Thermal and power signals can lag activity; half-overlap is an executable sparse default."
+          counterevidence_or_failure_modes:
+            - "coarse timestamps can create false overlap"
+          calibration_note: "Tune lag and overlap by source sampling and cooling design."
+    score_effect:
+      training_core_confidence_delta: 0
+      support_score_cap: 0.45
+      explanation_priority: low
+    routing_effect:
+      route_to: join_with_identity_shape
+      missing_joins_to_report: [fabric_identity_shape, checkpoint_identity_shape, serving_counterevidence]
+    false_positive_or_limitations:
+      - "Aligned physical load and activity still do not distinguish training from other accelerator work."
+    cannot_conclude: [training, model_development]
+    source_refs: [S07, S08, S09, S36, S37, S38, S39, S40, S41]
+
+  - id: memory_residency_context_screen
+    purpose: sparse_large_model_memory_context
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [hbm_or_device_memory_used]
+    emitted_statement:
+      label: large_model_memory_context_screen
+      category: large_model_context_support
+      max_confidence: screen
+      statement: "High device-memory use is large-model context, but can also be serving, cache, allocation, or idle residency."
+    trigger:
+      type: one_feature_memory_residency_logic
+      evaluation_window: memory_used_sample_window
+      conditions:
+        all:
+          - metric: hbm_or_device_memory_used_bytes
+            op: ">="
+            value_ref: min_sparse_memory_used_bytes
+          - metric: memory_value_type
+            op: in
+            value_ref: supportive_memory_value_types
+      calibration_defaults:
+        - name: min_sparse_memory_used_bytes
+          value: 40000000000
+          unit: bytes
+          evidence_status: calibration_default
+          source_refs: [S04, S05, S06, S07, S08, S09]
+          rationale: "A 40 GB sparse screen catches materially large accelerator memory residency while remaining below current high-end capacity."
+          counterevidence_or_failure_modes:
+            - "large inference, embeddings, caching, and idle loaded models can pass"
+            - "adapter or sharded training can be below this threshold"
+          calibration_note: "Replace with local memory-use distributions by workload and accelerator."
+        - name: supportive_memory_value_types
+          value: [used, allocated, high_water, resident]
+          unit: categorical_set
+          evidence_status: source_informed
+          source_refs: [S07, S08, S09]
+          rationale: "Used, allocated, resident, or high-water values can support memory-residency context."
+          counterevidence_or_failure_modes:
+            - "free-memory values require inversion and capacity context"
+          calibration_note: "Normalize telemetry source memory value semantics."
+    score_effect:
+      training_core_confidence_delta: 0
+      support_score_cap: 0.30
+      explanation_priority: low
+    routing_effect:
+      route_to: large_model_context_join
+      missing_joins_to_report: [memory_capacity_bytes, accelerator_activity, serving_counterevidence]
+    false_positive_or_limitations:
+      - "Memory residency alone is not training evidence."
+    cannot_conclude: [training, activity, model_size]
+    source_refs: [S04, S05, S06, S07, S08, S09]
+
+  - id: memory_capacity_residency_pair_screen
+    purpose: sparse_large_model_memory_pair_support
+    raw_feature_budget: 2
+    required_feature_sets:
+      any_one_of:
+        - [hbm_or_device_memory_used, memory_capacity_bytes]
+    emitted_statement:
+      label: large_model_memory_context_screen
+      category: large_model_context_support
+      max_confidence: weak
+      statement: "Device memory residency occupies a material fraction of memory capacity, supporting large-model context if joined with activity evidence."
+    trigger:
+      type: two_feature_memory_fraction_logic
+      evaluation_window: memory_used_capacity_overlap_window
       conditions:
         all:
           - metric: memory_residency_fraction
             op: ">="
-            value_ref: min_memory_residency_fraction
-          - metric: sustained_accelerator_activity_window.activity_score
+            value_ref: min_sparse_memory_residency_fraction
+          - metric: memory_capacity_overlap_fraction
             op: ">="
-            value_ref: min_activity_score_for_memory_support
-          - metric: activity_overlap_fraction
-            op: ">="
-            value_ref: min_activity_overlap_fraction
-        any:
-          - metric: checkpoint_size_consistency.size_consistency_score
-            op: ">="
-            value_ref: min_checkpoint_size_consistency_score
-          - metric: residency_change_score
-            op: ">="
-            value_ref: min_dynamic_residency_score
-      scoring:
-        memory_residency_support_score: "clamp(0.45 * memory_residency_fraction + 0.30 * activity_overlap_fraction + 0.25 * max(checkpoint_size_consistency.size_consistency_score, residency_change_score), 0, 1)"
-      score_effect:
-        training_core_confidence_delta: 1
-        applies_when_score_gte: 0.70
-        explanation_priority: medium
+            value_ref: min_memory_capacity_overlap_fraction
       calibration_defaults:
-        - name: min_memory_residency_fraction
+        - name: min_sparse_memory_residency_fraction
           value: 0.60
           unit: fraction_of_device_memory
           evidence_status: calibration_default
-          rationale: "Large model context should occupy a material fraction of device memory, but exact residency varies by model, sharding, cache, and serving."
-          counterevidence_or_failure_modes: ["large inference and cache-heavy jobs can exceed this", "adapter training can be below this"]
-          calibration_note: "Replace with local memory-residency distributions for training, inference, serving, and idle reservations."
-        - name: min_activity_score_for_memory_support
-          value: 0.50
-          unit: score_0_to_1
-          evidence_status: calibration_default
-          rationale: "Memory residency supports training only when joined with accelerator activity."
-          counterevidence_or_failure_modes: ["model serving can have high residency and activity"]
-          calibration_note: "Calibrate with hardware-specific activity and memory telemetry."
-        - name: min_activity_overlap_fraction
-          value: 0.50
-          unit: fraction
-          evidence_status: calibration_default
-          rationale: "Requires memory state to overlap at least half of the candidate activity window."
-          counterevidence_or_failure_modes: ["preloaded models can be resident before/after activity", "sampling gaps can lower overlap"]
-          calibration_note: "Tune using memory scrape interval and model preload behavior."
-        - name: min_checkpoint_size_consistency_score
-          value: 0.55
-          unit: score_0_to_1
-          evidence_status: source_informed
-          rationale: "Checkpoint-size consistency strengthens large trainable-state interpretation when present."
-          counterevidence_or_failure_modes: ["backup snapshots can also be size-consistent"]
-          calibration_note: "Replace with local checkpoint and backup size distributions."
-        - name: min_dynamic_residency_score
-          value: 0.40
-          unit: score_0_to_1
-          evidence_status: calibration_default
-          rationale: "Changing residency during activity is more supportive than static allocation."
-          counterevidence_or_failure_modes: ["serving can page/cache dynamically", "static full-model training can change little"]
-          calibration_note: "Calibrate per framework and memory manager."
-    output_fields:
-      - memory_residency_fraction
-      - residency_stability
-      - supports_large_model_context
-      - caveats
-    confidence_label: likely
-    source_refs: [S04, S05, S06, S07, S08, S09, S36, S37, S38, S39]
-
-  - id: memory_bandwidth_activity_support
-    purpose: supportive_activity_context
-    required_features:
-      - memory_bandwidth_or_dram_active
-    optional_features:
-      - memory_bandwidth_bytes_per_sec
-      - tensor_matrix_mxu_neuron_or_engine_active_fraction
-      - accelerator_busy_or_utilization_fraction
-      - storage_read_operation_bytes
-      - storage_write_operation_bytes
-      - cache_hit_miss_counters
-    derived_signals:
-      - sustained_accelerator_activity_window
-    time_alignment: "Memory activity must overlap accelerator activity or storage phases before it affects training support."
-    logic: >
-      Normalize observed memory activity by SKU capability. Step-correlated
-      memory activity strengthens a compute interpretation; isolated memory
-      pressure with low tensor activity is routed to data movement, inference,
-      ETL, or cache explanations.
-    output_fields:
-      - normalized_memory_activity
-      - activity_overlap_fraction
-      - support_label
-      - alternative_explanations
-    confidence_label: likely
-    source_refs: [S07, S08, S36, S37, S38, S39]
-
-  - id: storage_staging_support
-    purpose: supportive_data_lifecycle_context
-    required_features:
-      - storage_read_operation_bytes
-    optional_features:
-      - object_storage_operation_counts
-      - object_or_file_copy_movement_records
-      - storage_operation_intervals
-      - cache_hit_miss_counters
-      - north_south_external_egress
-      - data_center_interconnect_wan_usage
-      - compute_running_intervals
-      - allocated_accelerator_count_by_sku
-    derived_signals:
-      - storage_staging_window
-      - non_serving_score
-    time_alignment: "Classify read/copy-in windows by their relation to candidate compute start, sustained activity, and final export."
-    logic: >
-      Large read or copy-in before a candidate activity window supports dataset
-      staging; repeated reads during activity can support data loading. Weaken
-      support when storage-operation records indicate restore, backup, ETL, or
-      replication rather than training input.
-    trigger:
-      type: support_score_threshold_logic
-      evaluation_window: compute_window_with_storage_lookaround
-      portability: weak
-      source_refs: [S31, S32, S33, S34, S35]
-      lookback_seconds: 86400
-      lookahead_seconds: 21600
-      conditions:
-        all:
-          - metric: storage_staging_window.normalized_staging_score
-            op: ">="
-            value_ref: min_normalized_staging_score
-          - metric: storage_staging_window.relation_to_compute_window
-            op: in
-            value_ref: supportive_relations
-          - metric: storage_staging_window.coverage_fraction
-            op: ">="
-            value_ref: min_storage_coverage_fraction
-        none:
-          - metric: storage_staging_window.operation_type
-            op: in
-            value_ref: suppressing_storage_operation_types
-          - metric: storage_staging_window.bytes_explained_fraction
-            op: ">="
-            value_ref: max_explained_bytes_fraction_for_support
-      scoring:
-        storage_staging_support_score: "clamp(0.50 * normalized_staging_score + 0.30 * temporal_relation_score + 0.20 * non_serving_score.non_serving_score, 0, 1)"
-      score_effect:
-        training_core_confidence_delta: 1
-        applies_when_score_gte: 0.65
-        explanation_priority: medium
-      calibration_defaults:
-        - name: min_normalized_staging_score
-          value: 0.50
-          unit: score_0_to_1
-          evidence_status: calibration_default
-          rationale: "Uses normalized staging volume instead of a raw byte threshold."
-          counterevidence_or_failure_modes: ["ETL, backup restore, and replication can move similar or larger volumes"]
-          calibration_note: "Replace with dataset-size and storage baseline distributions."
-        - name: supportive_relations
-          value: [before, during]
-          unit: categorical_set
-          evidence_status: mechanism_inferred
-          rationale: "Dataset staging usually precedes or overlaps compute; final export is weaker support."
-          counterevidence_or_failure_modes: ["checkpoints and generated data can occur after compute", "prefetching can start long before compute"]
-          calibration_note: "Tune lookback/lookahead windows from local data pipeline behavior."
-        - name: min_storage_coverage_fraction
-          value: 0.75
-          unit: fraction
-          evidence_status: source_informed
-          rationale: "Storage logs are useful only when most relevant intervals are covered."
-          counterevidence_or_failure_modes: ["best-effort object logs can miss requests"]
-          calibration_note: "Replace with per-storage-system logging coverage."
-        - name: suppressing_storage_operation_types
-          value: [backup, restore, rebuild, replication, migration, disaster_recovery, etl_export]
-          unit: categorical_set
-          evidence_status: source_informed
-          rationale: "These operation labels are explicit non-training explanations for storage movement."
-          counterevidence_or_failure_modes: ["training can overlap with backup or replication windows"]
-          calibration_note: "Calibrate operation labels and bytes-explained accounting."
-        - name: max_explained_bytes_fraction_for_support
-          value: 0.50
-          unit: fraction
-          evidence_status: calibration_default
-          rationale: "If most bytes are explained by non-training storage operations, staging support should not strengthen training."
-          counterevidence_or_failure_modes: ["shared storage operations can partially overlap real staging"]
-          calibration_note: "Tune by storage-operation labeling accuracy."
-    output_fields:
-      - staging_window
-      - bytes_staged
-      - relation_to_compute_window
-      - support_label
-      - false_positive_explanations
-    confidence_label: likely
-    source_refs: [S31, S32, S33, S34, S35]
-
-  - id: internal_data_movement_support
-    purpose: supportive_network_context
-    required_features:
-      - east_west_internal_flow_bytes
-    optional_features:
-      - vpc_or_nsg_flow_records
-      - data_center_interconnect_wan_usage
-      - object_or_file_copy_movement_records
-      - storage_operation_intervals
-      - storage_read_operation_bytes
-      - storage_write_operation_bytes
-      - scaleout_port_tx_rx_bytes_packets
-    derived_signals:
-      - storage_staging_window
-      - non_serving_score
-    time_alignment: "Internal flow windows must be separated into accelerator-fabric, storage, service, and DCI scopes when source fields allow."
-    logic: >
-      Internal traffic among accelerator nodes and storage systems strengthens a
-      distributed-workload or data-pipeline interpretation only when it aligns
-      with accelerator activity. Prefer fabric telemetry for collective claims;
-      treat general flow logs as supportive or explanatory.
-    output_fields:
-      - internal_bytes
-      - flow_scope
-      - relation_to_candidate_window
-      - support_label
-      - likely_non_training_explanation
-    confidence_label: likely
-    source_refs: [S28, S29, S30, S31, S33]
-
-  - id: power_thermal_physical_support
-    purpose: physical_consistency_support
-    required_features:
-      - accelerator_device_power_energy
-    optional_features:
-      - server_system_input_power
-      - rack_pdu_it_power
-      - facility_or_room_it_power_rollup
-      - accelerator_temperature_celsius
-      - inlet_outlet_air_or_coolant_temperature
-      - coolant_flow_rate
-      - coolant_pressure
-      - pump_speed_or_state
-      - valve_position_or_state
-      - cooling_alarm_state
-      - fan_speed_rpm_or_percent
-      - airflow_rate
-      - thermal_control_mode
-      - source_reported_airflow_state
-      - outdoor_air_temperature_celsius
-      - outdoor_humidity_percent
-      - hvac_control_mode
-      - economizer_state
-      - facility_temperature_setpoint_celsius
-      - tensor_matrix_mxu_neuron_or_engine_active_fraction
-      - accelerator_busy_or_utilization_fraction
-    derived_signals:
-      - sustained_accelerator_activity_window
-      - cap_clock_power_factor
-    time_alignment: "Normalize physical channels for thermal lag, control mode, ambient conditions, and scope mapping."
-    logic: >
-      Baseline-subtracted power, heat, fan, flow, and temperature responses
-      support that substantial infrastructure load occurred. These channels
-      validate or challenge activity evidence but do not classify the workload.
-    trigger:
-      type: physical_support_threshold_logic
-      evaluation_window: lag_adjusted_activity_window
-      portability: moderate
-      source_refs: [S07, S08, S09, S40, S41]
-      conditions:
-        all:
-          - metric: physical_load_score
-            op: ">="
-            value_ref: min_physical_load_score
-          - metric: lag_adjusted_overlap
-            op: ">="
-            value_ref: min_lag_adjusted_overlap_fraction
-          - metric: physical_channel_coverage_fraction
-            op: ">="
-            value_ref: min_physical_channel_coverage_fraction
-        none:
-          - metric: cooling_alarm_or_maintenance_explanation_score
-            op: ">="
-            value_ref: physical_explanation_suppression_score
-      scoring:
-        physical_support_score: "clamp(0.50 * physical_load_score + 0.30 * lag_adjusted_overlap + 0.20 * thermal_response_score, 0, 1)"
-      score_effect:
-        training_core_confidence_delta: 1
-        applies_when_score_gte: 0.70
-        explanation_priority: low
-      calibration_defaults:
-        - name: min_physical_load_score
-          value: 0.60
-          unit: score_0_to_1
-          evidence_status: calibration_default
-          rationale: "Physical support should show material baseline-subtracted load, normalized to scope capacity."
-          counterevidence_or_failure_modes: ["CPU/storage loads, mixed tenants, and cooling faults can raise physical load"]
-          calibration_note: "Replace with local rack/device power and cooling baselines."
-        - name: min_lag_adjusted_overlap_fraction
-          value: 0.60
-          unit: fraction
-          evidence_status: calibration_default
-          rationale: "Thermal and cooling responses lag compute; overlap must be lag-adjusted."
-          counterevidence_or_failure_modes: ["thermal inertia and control policy can obscure overlap"]
-          calibration_note: "Calibrate lag by cooling design and telemetry interval."
-        - name: min_physical_channel_coverage_fraction
+          source_refs: [S04, S05, S06, S07, S08, S09]
+          rationale: "High fractional memory residency is stronger context than raw bytes, but remains workload-ambiguous."
+          counterevidence_or_failure_modes:
+            - "serving and cache-heavy workloads can occupy most memory"
+            - "ZeRO, offload, and adapter training can use less memory"
+          calibration_note: "Calibrate by model family, sharding, serving, and cache behavior."
+        - name: min_memory_capacity_overlap_fraction
           value: 0.80
           unit: fraction
           evidence_status: source_informed
-          rationale: "Power and cooling telemetry must cover most of the candidate window."
-          counterevidence_or_failure_modes: ["DCIM/BMS sampling can be sparse or scope-mismatched"]
-          calibration_note: "Replace with source-specific coverage."
-        - name: physical_explanation_suppression_score
-          value: 0.75
-          unit: score_0_to_1
-          evidence_status: calibration_default
-          rationale: "Known cooling faults or maintenance can explain physical changes without supporting workload identity."
-          counterevidence_or_failure_modes: ["maintenance can overlap real training"]
-          calibration_note: "Tune with maintenance and alarm records."
-    output_fields:
-      - physical_load_support
-      - lag_adjusted_overlap
-      - thermal_or_cooling_explanations
-      - confidence
-    confidence_label: likely
-    source_refs: [S07, S08, S09, S40, S41]
+          source_refs: [S07, S08, S09]
+          rationale: "The capacity and use samples should cover the same memory window."
+          counterevidence_or_failure_modes:
+            - "sample timing mismatch can distort fractions"
+          calibration_note: "Tune by scrape period and device mapping."
+    score_effect:
+      training_core_confidence_delta: 0
+      support_score_cap: 0.45
+      explanation_priority: low
+    routing_effect:
+      route_to: join_with_activity_and_checkpoint
+      missing_joins_to_report: [accelerator_activity, checkpoint_identity_shape, serving_counterevidence]
+    false_positive_or_limitations:
+      - "Fractional residency is not a workload identity signal by itself."
+    cannot_conclude: [training, activity]
+    source_refs: [S04, S05, S06, S07, S08, S09]
 
-  - id: lifecycle_preemption_context
-    purpose: supportive_operational_context
-    required_features:
-      - resource_container_lifecycle_events
-    optional_features:
-      - allocation_preemption_events
-      - compute_running_intervals
-      - allocated_accelerator_count_by_sku
-      - storage_write_operation_bytes
-      - object_storage_operation_counts
-      - container_resource_usage_quantity
-      - maintenance_operation_intervals
-    derived_signals:
-      - checkpoint_periodicity_score
-      - clock_aligned_overlap_window
-    time_alignment: "Lifecycle and preemption events affect only overlapping or immediately adjacent candidate windows."
-    logic: >
-      Start, restart, failure, and preemption events bound job windows and can
-      explain checkpoint bursts, fragmented activity, and gaps. They are
-      supportive only when workload-shape evidence exists.
-    output_fields:
-      - lifecycle_context_label
-      - affected_window
-      - restart_or_preemption_count
-      - checkpoint_relation
-      - caveats
-    confidence_label: likely
-    source_refs: [S18, S21, S22, S38]
-
-  - id: topology_training_context
-    purpose: supportive_topology_context
-    required_features:
-      - scaleout_fabric_domain_graph
-    optional_features:
-      - local_accelerator_interconnect_domain
-      - cross_site_or_dci_connectivity
-      - topology_change_events
-      - fabric_port_device_sample_counters
-      - rdma_congestion_retry_drop_error_counters
-      - scaleout_port_tx_rx_bytes_packets
-      - local_interconnect_tx_rx_bytes
-    derived_signals:
-      - largest_usable_topology_domain
-      - stable_participant_set
-    time_alignment: "Use the topology state active during the candidate fabric/activity window."
-    logic: >
-      A coherent low-latency topology strengthens plausibility of distributed
-      training when core evidence is present. Topology capability alone remains
-      capacity/support, not training identity.
+  - id: storage_staging_support_screen
+    purpose: sparse_data_staging_support
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [storage_read_operation_bytes]
+        - [object_storage_operation_counts]
+        - [north_south_external_egress]
+        - [data_center_interconnect_wan_usage]
+    emitted_statement:
+      label: data_staging_support_screen
+      category: data_lifecycle_support
+      max_confidence: screen
+      statement: "Large or repeated read, object, egress, or DCI movement can be dataset or artifact staging context, but many non-training workflows share it."
     trigger:
-      type: topology_support_threshold_logic
-      evaluation_window: candidate_fabric_activity_window
-      portability: moderate
-      source_refs: [S11, S15, S16, S17, S25, S42, S43]
+      type: one_feature_storage_staging_logic
+      evaluation_window: storage_or_egress_interval
       conditions:
         all:
-          - metric: largest_usable_topology_domain.domain_accelerator_count
+          - metric: normalized_staging_or_transfer_score
             op: ">="
-            value_ref: min_domain_accelerator_count
-          - metric: largest_usable_topology_domain.topology_support_score
+            value_ref: min_sparse_staging_score
+          - metric: storage_or_network_coverage_fraction
             op: ">="
-            value_ref: min_topology_support_score
-          - metric: topology_mapping_coverage_fraction
-            op: ">="
-            value_ref: min_topology_mapping_coverage_fraction
-        none:
-          - metric: route_or_topology_change_overlap_fraction
-            op: ">="
-            value_ref: route_change_suppression_overlap_fraction
-      scoring:
-        topology_training_support_score: "clamp(0.45 * topology_support_score + 0.35 * participant_fit_score + 0.20 * topology_mapping_coverage_fraction, 0, 1)"
-      score_effect:
-        training_core_confidence_delta: 1
-        applies_when_score_gte: 0.70
-        explanation_priority: medium
+            value_ref: min_sparse_staging_coverage_fraction
       calibration_defaults:
-        - name: min_domain_accelerator_count
-          value: 16
-          unit: accelerators
+        - name: min_sparse_staging_score
+          value: 0.50
+          unit: score_0_to_1
           evidence_status: calibration_default
-          rationale: "Coherent multi-node topology is supportive only when it can host a material participant set."
-          counterevidence_or_failure_modes: ["smaller training jobs can be real", "large HPC domains can pass"]
-          calibration_note: "Calibrate by local training and HPC topology footprints."
-        - name: min_topology_support_score
+          source_refs: [S28, S29, S31, S32, S33, S34, S35]
+          rationale: "Use normalized volume relative to local baseline or participant memory rather than raw bytes."
+          counterevidence_or_failure_modes:
+            - "backup, restore, ETL, replication, logs, and artifact export can pass"
+          calibration_note: "Replace with storage and network baselines by service, tenant, and workload class."
+        - name: min_sparse_staging_coverage_fraction
+          value: 0.60
+          unit: fraction
+          evidence_status: source_informed
+          source_refs: [S28, S29, S31, S34]
+          rationale: "Sparse staging support should be retained with moderate coverage but carry explicit caveats."
+          counterevidence_or_failure_modes:
+            - "flow and object logs can be sampled, delayed, best-effort, or skipped"
+          calibration_note: "Replace with per-source logging completeness."
+    score_effect:
+      training_core_confidence_delta: 0
+      support_score_cap: 0.35
+      explanation_priority: medium
+    routing_effect:
+      route_to: data_lifecycle_join
+      missing_joins_to_report: [compute_window, storage_operation_intervals, accelerator_activity]
+    false_positive_or_limitations:
+      - "Staging support only strengthens training after core activity exists."
+    cannot_conclude: [training, checkpointing, model_development]
+    source_refs: [S28, S29, S31, S32, S33, S34, S35]
+
+  - id: object_copy_data_movement_support_screen
+    purpose: sparse_copy_movement_context
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [object_or_file_copy_movement_records]
+    emitted_statement:
+      label: data_copy_movement_context_screen
+      category: data_lifecycle_support
+      max_confidence: screen
+      statement: "Object or file copy/movement records provide data lifecycle context and may also explain storage or network bursts."
+    trigger:
+      type: one_feature_copy_movement_logic
+      evaluation_window: copy_movement_interval
+      conditions:
+        all:
+          - metric: bytes_moved
+            op: ">="
+            value_ref: min_copy_bytes_to_emit
+          - metric: route_class_known
+            op: "=="
+            value: true
+      calibration_defaults:
+        - name: min_copy_bytes_to_emit
+          value: 0
+          unit: bytes
+          evidence_status: source_informed
+          source_refs: [S31, S32, S33, S34, S35]
+          rationale: "Even zero or unknown bytes with a source-emitted copy interval can route explanation review; byte materiality is scored separately."
+          counterevidence_or_failure_modes:
+            - "metadata-only or failed copy events may not explain traffic"
+          calibration_note: "Normalize success status, bytes moved, route class, and source coverage."
+    score_effect:
+      training_core_confidence_delta: 0
+      support_score_cap: 0.25
+      explanation_priority: medium
+    routing_effect:
+      route_to: storage_or_network_explanation_join
+      missing_joins_to_report: [storage_operation_intervals, flow_or_fabric_bytes, compute_window]
+    false_positive_or_limitations:
+      - "Copy movement can be dataset staging, backup, migration, artifact export, or ETL."
+    cannot_conclude: [training, checkpointing]
+    source_refs: [S31, S32, S33, S34, S35]
+
+  - id: cache_epoch_context_screen
+    purpose: sparse_cache_epoch_context
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [cache_hit_miss_counters]
+    emitted_statement:
+      label: cache_epoch_context_screen
+      category: data_lifecycle_support
+      max_confidence: screen
+      statement: "Cache hit/miss curves provide weak data-reuse or input-bottleneck context; they are highly workload and tenant dependent."
+    trigger:
+      type: one_feature_cache_context_logic
+      evaluation_window: cache_counter_interval
+      conditions:
+        any:
+          - metric: cache_miss_burst_score
+            op: ">="
+            value_ref: min_cache_miss_burst_score
+          - metric: cache_hit_rate_change_score
+            op: ">="
+            value_ref: min_cache_hit_rate_change_score
+      calibration_defaults:
+        - name: min_cache_miss_burst_score
+          value: 0.50
+          unit: score_0_to_1
+          evidence_status: calibration_default
+          source_refs: [S33, S34, S35]
+          rationale: "Cache miss bursts can route data-loading review but are not portable across storage and cache systems."
+          counterevidence_or_failure_modes:
+            - "serving cold starts, ETL, package installs, and multi-tenant cache churn can pass"
+          calibration_note: "Replace with cache baselines and known dataset-pass traces."
+        - name: min_cache_hit_rate_change_score
+          value: 0.50
+          unit: score_0_to_1
+          evidence_status: calibration_default
+          source_refs: [S33, S34, S35]
+          rationale: "Hit-rate changes can support epoch-like reuse only after joining with compute windows."
+          counterevidence_or_failure_modes:
+            - "cache warming and serving can produce similar curves"
+          calibration_note: "Calibrate by cache policy and workload class."
+    score_effect:
+      training_core_confidence_delta: 0
+      support_score_cap: 0.20
+      explanation_priority: low
+    routing_effect:
+      route_to: data_reuse_review
+      missing_joins_to_report: [storage_reads, accelerator_activity, compute_window]
+    false_positive_or_limitations:
+      - "Cache signals are weak without compute and storage context."
+    cannot_conclude: [training, epoch_count]
+    source_refs: [S33, S34, S35]
+
+  - id: topology_distributed_work_support_screen
+    purpose: sparse_topology_context_support
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [scaleout_fabric_domain_graph]
+        - [local_accelerator_interconnect_domain]
+        - [cross_site_or_dci_connectivity]
+    emitted_statement:
+      label: topology_distributed_work_support_screen
+      category: topology_context_support
+      max_confidence: screen
+      statement: "Topology capability supports distributed-work plausibility, but observed activity and identity-shape evidence are still required."
+    trigger:
+      type: one_feature_topology_context_logic
+      evaluation_window: topology_validity_or_sample_window
+      conditions:
+        all:
+          - metric: topology_context_score
+            op: ">="
+            value_ref: min_sparse_topology_context_score
+          - metric: topology_coverage_fraction
+            op: ">="
+            value_ref: min_sparse_topology_coverage_fraction
+      calibration_defaults:
+        - name: min_sparse_topology_context_score
+          value: 0.50
+          unit: score_0_to_1
+          evidence_status: calibration_default
+          source_refs: [S11, S15, S16, S17, S25, S42, S43]
+          rationale: "A moderate topology score routes distributed-work review without claiming activity."
+          counterevidence_or_failure_modes:
+            - "HPC, benchmark, inference, and storage clusters can have similar topology"
+          calibration_note: "Replace with local topology scores by workload and fabric generation."
+        - name: min_sparse_topology_coverage_fraction
+          value: 0.70
+          unit: fraction
+          evidence_status: source_informed
+          source_refs: [S25, S42, S43]
+          rationale: "Topology capability must cover most of the sparse context window."
+          counterevidence_or_failure_modes:
+            - "route changes or link failures can invalidate topology capability"
+          calibration_note: "Calibrate by topology inventory update cadence."
+    score_effect:
+      training_core_confidence_delta: 0
+      support_score_cap: 0.35
+      explanation_priority: medium
+    routing_effect:
+      route_to: fabric_activity_join
+      missing_joins_to_report: [scaleout_port_tx_rx_bytes_packets, accelerator_activity, allocation_or_running]
+    false_positive_or_limitations:
+      - "Topology capability alone is not fabric telemetry."
+    cannot_conclude: [training, collective_activity]
+    source_refs: [S11, S15, S16, S17, S25, S42, S43]
+
+  - id: serving_like_network_counterevidence_screen
+    purpose: sparse_serving_counterevidence
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [load_balancer_gateway_flow_activity]
+        - [north_south_external_egress]
+        - [vpc_or_nsg_flow_records]
+    emitted_statement:
+      label: serving_like_counterevidence_screen
+      category: serving_counterevidence
+      max_confidence: screen
+      statement: "Serving-like gateway, external egress, or flow shape is counterevidence for non-serving training interpretations when aligned with accelerator activity."
+    trigger:
+      type: one_feature_serving_counterevidence_logic
+      evaluation_window: serving_network_interval
+      conditions:
+        all:
+          - metric: serving_counterevidence_score
+            op: ">="
+            value_ref: min_sparse_serving_counterevidence_score
+          - metric: serving_channel_coverage_fraction
+            op: ">="
+            value_ref: min_sparse_serving_coverage_fraction
+      calibration_defaults:
+        - name: min_sparse_serving_counterevidence_score
           value: 0.65
           unit: score_0_to_1
           evidence_status: calibration_default
-          rationale: "Requires useful domain size, fabric health, and mapping coverage."
-          counterevidence_or_failure_modes: ["topology health supports possibility, not identity"]
-          calibration_note: "Tune by fabric generation and topology telemetry."
-        - name: min_topology_mapping_coverage_fraction
-          value: 0.80
+          source_refs: [S27, S28, S29, S30, S34]
+          rationale: "Serving-like network shape should be retained as counterevidence, but one channel should not fully suppress a candidate alone."
+          counterevidence_or_failure_modes:
+            - "dataset fetches, artifact export, batch APIs, service mesh, and logging can resemble serving"
+          calibration_note: "Replace with local serving, batch inference, export, and training network traces."
+        - name: min_sparse_serving_coverage_fraction
+          value: 0.60
           unit: fraction
           evidence_status: source_informed
-          rationale: "Topology support requires mapped devices, ports, or instances for most of the window."
-          counterevidence_or_failure_modes: ["port-to-job mapping gaps can lower true support"]
-          calibration_note: "Replace with topology inventory and fabric telemetry coverage."
-        - name: route_change_suppression_overlap_fraction
-          value: 0.50
-          unit: fraction
-          evidence_status: calibration_default
-          rationale: "Large route/topology changes during candidate windows can invalidate support."
-          counterevidence_or_failure_modes: ["planned expansion can coexist with real training"]
-          calibration_note: "Tune by network maintenance and route-change semantics."
-    output_fields:
-      - topology_support_label
-      - largest_domain_accelerator_count
-      - fabric_class
-      - topology_caveats
-    confidence_label: likely
-    source_refs: [S11, S15, S16, S17, S25, S42, S43]
-
-  - id: partition_shape_context
-    purpose: supportive_or_counterevidence_context
-    required_features:
-      - accelerator_partitioning_intervals
-    optional_features:
-      - allocated_accelerator_count_by_sku
-      - container_resource_request_quantity
-      - container_resource_limit_quantity
-      - hbm_or_device_memory_used
-      - scaleout_port_tx_rx_bytes_packets
-    derived_signals:
-      - available_accelerator_fraction
-    time_alignment: "Evaluate partition shape over the same allocation and activity window."
-    logic: >
-      Full-device or large coherent partitions support large synchronized
-      training plausibility. Many small MIG/vGPU slices weaken a single-run
-      interpretation unless the hypothesis is multi-tenant fine-tuning or
-      many-shard model development.
-    output_fields:
-      - partition_support_label
-      - partition_profile_summary
-      - single_large_run_plausibility
-      - caveats
-    confidence_label: likely
-    source_refs: [S10, S19, S20]
-
-  - id: cache_epoch_support
-    purpose: weak_supportive_data_pattern
-    required_features:
-      - cache_hit_miss_counters
-    optional_features:
-      - storage_read_operation_bytes
-      - filesystem_throughput_metadata_ops
-      - object_storage_operation_counts
-      - tensor_matrix_mxu_neuron_or_engine_active_fraction
-      - compute_running_intervals
-    derived_signals:
-      - storage_staging_window
-    time_alignment: "Compare cache curves to repeated data-read and accelerator activity windows."
-    logic: >
-      Increasing hit rates after initial staging can weakly support repeated
-      dataset passes. High misses during GPU activity can explain input
-      bottlenecks. This remains weak because cache behavior is highly workload
-      and tenant dependent.
-    output_fields:
-      - cache_support_label
-      - hit_rate_curve
-      - relation_to_activity_window
-      - caveats
-    confidence_label: project_assumption
-    source_refs: [S33, S34, S35]
-
-  - id: serving_heavy_network_counterevidence
-    purpose: false_positive_filter
-    required_features:
-      - load_balancer_gateway_flow_activity
-    optional_features:
-      - north_south_external_egress
-      - vpc_or_nsg_flow_records
-      - east_west_internal_flow_bytes
-      - container_resource_usage_quantity
-      - storage_read_operation_bytes
-      - storage_write_operation_bytes
-    derived_signals:
-      - non_serving_score
-    time_alignment: "Compare serving-like network shape to the same high accelerator activity window."
-    logic: >
-      High external connection counts, request fan-in/fan-out, or response-like
-      egress during high tensor activity can indicate inference or serving
-      rather than training. Low serving signals strengthen non-serving
-      interpretations but do not prove training.
-    trigger:
-      type: counterevidence_threshold_logic
-      evaluation_window: high_activity_window
-      portability: moderate
-      source_refs: [S27, S28, S29, S30, S34]
-      conditions:
-        all:
-          - metric: non_serving_score.serving_counterevidence_score
-            op: ">="
-            value_ref: min_serving_counterevidence_score
-          - metric: serving_activity_overlap_fraction
-            op: ">="
-            value_ref: min_serving_activity_overlap_fraction
-          - metric: serving_channel_coverage_fraction
-            op: ">="
-            value_ref: min_serving_channel_coverage_fraction
-        any:
-          - metric: non_serving_score.gateway_connection_rate_score
-            op: ">="
-            value_ref: min_gateway_connection_rate_score
-          - metric: non_serving_score.request_response_shape_score
-            op: ">="
-            value_ref: min_request_response_shape_score
-          - metric: non_serving_score.external_egress_response_score
-            op: ">="
-            value_ref: min_external_egress_response_score
-      score_effect:
-        training_core_confidence_delta: -1
-        explanation_priority: high
-        suppresses_rules:
-          - collective_cadence_training
-          - sustained_ml_compute_nonserving
-          - achieved_ops_training_candidate
-        suppresses_confidence_at_or_above: medium
-      calibration_defaults:
-        - name: min_serving_counterevidence_score
-          value: 0.70
-          unit: score_0_to_1
-          evidence_status: calibration_default
-          rationale: "High normalized serving-shape score should weaken training interpretations."
-          counterevidence_or_failure_modes: ["artifact export, dataset fetches, and shared gateways can resemble serving"]
-          calibration_note: "Replace with local inference/serving and training network traces."
-        - name: min_serving_activity_overlap_fraction
-          value: 0.50
-          unit: fraction
-          evidence_status: calibration_default
-          rationale: "Serving counterevidence should overlap the high-compute candidate window."
-          counterevidence_or_failure_modes: ["coarse flow logs can overstate overlap"]
-          calibration_note: "Tune by flow aggregation interval and clock alignment."
-        - name: min_serving_channel_coverage_fraction
-          value: 0.80
-          unit: fraction
-          evidence_status: source_informed
-          rationale: "Serving-shape absence or presence requires adequate flow/gateway coverage."
-          counterevidence_or_failure_modes: ["sampled or disabled flow logs can miss serving traffic"]
-          calibration_note: "Replace with source sampling and coverage settings."
-        - name: min_gateway_connection_rate_score
-          value: 0.75
-          unit: score_0_to_1
-          evidence_status: calibration_default
-          rationale: "High gateway connection rate during compute is a serving-like signal."
-          counterevidence_or_failure_modes: ["data ingestion and service-mesh traffic can inflate connection rate"]
-          calibration_note: "Calibrate by local gateway baselines."
-        - name: min_request_response_shape_score
-          value: 0.70
-          unit: score_0_to_1
-          evidence_status: calibration_default
-          rationale: "Request/response-like flow shape distinguishes serving from many offline jobs."
-          counterevidence_or_failure_modes: ["batch APIs and synthetic data pipelines may mimic request/response"]
-          calibration_note: "Tune by service architecture and batch workflow traces."
-        - name: min_external_egress_response_score
-          value: 0.70
-          unit: score_0_to_1
-          evidence_status: calibration_default
-          rationale: "High response-like external egress during accelerator activity weakens training identity."
-          counterevidence_or_failure_modes: ["artifact exports can look like egress responses"]
-          calibration_note: "Calibrate against known exports and serving windows."
-    output_fields:
-      - serving_counterevidence_label
-      - gateway_connection_rate
-      - external_egress_bytes
-      - non_serving_score
-      - exceptions
-    confidence_label: likely
+          source_refs: [S27, S28, S29, S30, S34]
+          rationale: "Presence of serving-like records can be useful at moderate coverage; absence still cannot imply non-serving."
+          counterevidence_or_failure_modes:
+            - "flow logs can be sampled, aggregated, skipped, delayed, or disabled"
+          calibration_note: "Replace with source-specific flow/gateway coverage."
+    score_effect:
+      training_core_confidence_delta: 0
+      support_score_cap: 0.40
+      explanation_priority: high
+      suppresses_confidence_at_or_above: medium_only_when_joined_to_activity
+    routing_effect:
+      route_to: serving_false_positive_review
+      missing_joins_to_report: [accelerator_activity, storage_operation_intervals, compute_window]
+    false_positive_or_limitations:
+      - "Serving counterevidence should be time-aligned with activity before weakening a training candidate."
+    cannot_conclude: [not_training, serving_workload]
     source_refs: [S27, S28, S29, S30, S34]
 
-  - id: benchmark_like_collective_counterevidence
-    purpose: false_positive_filter
-    required_features:
-      - scaleout_port_tx_rx_bytes_packets
-    optional_features:
-      - local_interconnect_tx_rx_bytes
-      - fabric_port_device_sample_counters
-      - rdma_congestion_retry_drop_error_counters
-      - tensor_matrix_mxu_neuron_or_engine_active_fraction
-      - accelerator_busy_or_utilization_fraction
-      - allocated_accelerator_count_by_sku
-      - compute_running_intervals
-      - container_resource_usage_quantity
-      - storage_write_operation_bytes
-      - object_storage_operation_counts
-    derived_signals:
-      - collective_cadence_score
-      - fabric_compute_time_alignment
-      - checkpoint_periodicity_score
-    time_alignment: "Check benchmark alternatives within the same participant set and fabric window."
-    logic: >
-      Very regular fabric bursts, limited storage/checkpoint evidence, short
-      duration, or low trainable-state lifecycle support can indicate NCCL/MPI
-      tests or burn-in rather than training. Suppress strong labels unless other
-      identity evidence remains.
+  - id: storage_operation_explanation_screen
+    purpose: sparse_storage_operation_explanation
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [storage_operation_intervals]
+    emitted_statement:
+      label: storage_operation_explanation_screen
+      category: storage_operation_explanation
+      max_confidence: screen
+      statement: "Explicit storage backup, restore, rebuild, replication, migration, copy, or ETL intervals can explain storage, WAN, or fabric-like traffic."
     trigger:
-      type: counterevidence_threshold_logic
-      evaluation_window: candidate_fabric_activity_window
-      portability: moderate
-      source_refs: [S11, S15, S16, S17, S25]
+      type: one_feature_storage_operation_explanation_logic
+      evaluation_window: storage_operation_interval
       conditions:
         all:
-          - metric: collective_cadence_score.cadence_score
+          - metric: operation_type
+            op: in
+            value_ref: explanatory_storage_operation_types
+          - metric: bytes_moved
             op: ">="
-            value_ref: min_collective_similarity_score
-          - metric: benchmark_regularity_score
-            op: ">="
-            value_ref: min_benchmark_regularity_score
-          - metric: benchmark_duration_seconds
-            op: "<="
-            value_ref: max_benchmark_like_duration_seconds
-          - metric: checkpoint_periodicity_score.periodicity_score
-            op: "<="
-            value_ref: max_checkpoint_support_score_for_benchmark
-        any:
-          - metric: container_command_or_image_benchmark_score
-            op: ">="
-            value_ref: min_declared_benchmark_score
-          - metric: collective_cadence_score.normalized_fabric_burst_score
-            op: ">="
-            value_ref: min_benchmark_fabric_burst_score
-      score_effect:
-        training_core_confidence_delta: -1
-        explanation_priority: high
-        suppresses_rules:
-          - collective_cadence_training
-          - achieved_ops_training_candidate
-        suppresses_confidence_at_or_above: strong
+            value_ref: min_storage_operation_bytes_to_emit
       calibration_defaults:
-        - name: min_collective_similarity_score
-          value: 0.75
-          unit: score_0_to_1
-          evidence_status: mechanism_inferred
-          rationale: "Benchmarks can be collective-heavy; high collective similarity is counterevidence when training lifecycle support is absent."
-          counterevidence_or_failure_modes: ["short training tests can look benchmark-like"]
-          calibration_note: "Calibrate with local NCCL/MPI benchmark and confirmed training traces."
-        - name: min_benchmark_regularity_score
-          value: 0.90
+        - name: explanatory_storage_operation_types
+          value: [backup, restore, rebuild, replication, migration, disaster_recovery, snapshot, object_copy, etl_export]
+          unit: categorical_set
+          evidence_status: source_informed
+          source_refs: [S31, S32, S33, S34, S35]
+          rationale: "Source-emitted storage operation labels are direct explanation candidates for storage and network movement."
+          counterevidence_or_failure_modes:
+            - "operation labels can be coarse and overlap real training"
+          calibration_note: "Normalize local storage operation taxonomy."
+        - name: min_storage_operation_bytes_to_emit
+          value: 0
+          unit: bytes
+          evidence_status: source_informed
+          source_refs: [S31, S32, S33, S34, S35]
+          rationale: "Even operation intervals without byte fields can route explanation checks; byte materiality is handled when traffic features are present."
+          counterevidence_or_failure_modes:
+            - "zero-byte or failed operations may not explain traffic"
+          calibration_note: "Use source status, bytes moved, and object count where available."
+    score_effect:
+      training_core_confidence_delta: 0
+      support_score_cap: 0.35
+      explanation_priority: high
+      suppresses_confidence_at_or_above: medium_only_when_overlapping_activity
+    routing_effect:
+      route_to: storage_explanation_join
+      missing_joins_to_report: [storage_write_operation_bytes, scaleout_port_tx_rx_bytes_packets, vpc_or_nsg_flow_records]
+    false_positive_or_limitations:
+      - "Explicit storage operations explain only overlapping and attributable bytes."
+    cannot_conclude: [not_training, no_checkpointing]
+    source_refs: [S31, S32, S33, S34, S35]
+
+  - id: benchmark_like_alternative_screen
+    purpose: sparse_benchmark_like_counterevidence
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [scaleout_port_tx_rx_bytes_packets]
+        - [local_interconnect_tx_rx_bytes]
+        - [fabric_port_device_sample_counters]
+    emitted_statement:
+      label: benchmark_like_alternative_screen
+      category: benchmark_hpc_alternative
+      max_confidence: screen
+      statement: "Highly regular fabric bursts can be benchmark-like or burn-in-like and should suppress overpromotion until lifecycle and checkpoint evidence are checked."
+    trigger:
+      type: one_feature_benchmark_like_fabric_logic
+      evaluation_window: fabric_burst_interval
+      conditions:
+        all:
+          - metric: fabric_burst_regularity_score
+            op: ">="
+            value_ref: min_sparse_benchmark_regularity_score
+          - metric: fabric_burst_duration_seconds
+            op: "<="
+            value_ref: max_sparse_benchmark_duration_seconds
+      calibration_defaults:
+        - name: min_sparse_benchmark_regularity_score
+          value: 0.85
           unit: score_0_to_1
           evidence_status: calibration_default
-          rationale: "Synthetic communication tests are often more regular than full training traces."
-          counterevidence_or_failure_modes: ["some training steps can be very regular"]
-          calibration_note: "Tune by benchmark suite and model family."
-        - name: max_benchmark_like_duration_seconds
+          source_refs: [S11, S15, S16, S17, S25, S42, S43]
+          rationale: "Synthetic communication tests are often very regular; exact threshold is not portable."
+          counterevidence_or_failure_modes:
+            - "some training steps are regular and some benchmarks are long or irregular"
+          calibration_note: "Calibrate with local NCCL/MPI benchmark, burn-in, and training traces."
+        - name: max_sparse_benchmark_duration_seconds
           value: 7200
           unit: seconds
           evidence_status: calibration_default
-          rationale: "Short high-regularity fabric tests are more likely benchmarks or burn-in than large training."
-          counterevidence_or_failure_modes: ["long benchmarks and short fine-tunes exist"]
-          calibration_note: "Replace with local benchmark/burn-in duration distributions."
-        - name: max_checkpoint_support_score_for_benchmark
-          value: 0.25
-          unit: score_0_to_1
-          evidence_status: calibration_default
-          rationale: "Benchmark alternative is stronger when checkpoint-like support is absent."
-          counterevidence_or_failure_modes: ["training without visible checkpoints can be real"]
-          calibration_note: "Tune by framework checkpoint visibility."
-        - name: min_declared_benchmark_score
-          value: 0.70
-          unit: score_0_to_1
-          evidence_status: project_assumption
-          rationale: "Container command/image/runtime hints can strengthen benchmark explanation without relying on client semantics alone."
-          counterevidence_or_failure_modes: ["names can be misleading or unavailable"]
-          calibration_note: "Use only infrastructure-visible metadata allowed by the monitoring regime."
-        - name: min_benchmark_fabric_burst_score
-          value: 0.80
-          unit: score_0_to_1
-          evidence_status: calibration_default
-          rationale: "High normalized fabric bursts with little checkpoint/lifecycle support are benchmark-like."
-          counterevidence_or_failure_modes: ["large distributed training can also have high normalized bursts"]
-          calibration_note: "Calibrate by fabric generation and benchmark suite."
-    output_fields:
-      - benchmark_counterevidence_label
-      - regularity_score
-      - duration_seconds
-      - checkpoint_absence
-      - residual_training_support
-    confidence_label: likely
-    source_refs: [S11, S15, S16, S17, S25]
+          source_refs: [S11, S15, S16, S17, S25]
+          rationale: "Short high-regularity fabric windows are useful benchmark-like screens."
+          counterevidence_or_failure_modes:
+            - "short fine-tunes and long benchmarks exist"
+          calibration_note: "Replace with local benchmark and job-duration distributions."
+    score_effect:
+      training_core_confidence_delta: 0
+      support_score_cap: 0.40
+      explanation_priority: high
+      suppresses_confidence_at_or_above: medium_only_when_joined_to_candidate
+    routing_effect:
+      route_to: benchmark_or_burnin_review
+      missing_joins_to_report: [accelerator_activity, checkpoint_identity_shape, allocation_or_running]
+    false_positive_or_limitations:
+      - "Fabric regularity alone cannot identify benchmark or training."
+    cannot_conclude: [not_training, benchmark]
+    source_refs: [S11, S15, S16, S17, S25, S42, S43]
 
-  - id: storage_rebuild_backup_explanation
-    purpose: false_positive_filter
-    required_features:
-      - storage_operation_intervals
-    optional_features:
-      - storage_read_operation_bytes
-      - storage_write_operation_bytes
-      - filesystem_throughput_metadata_ops
-      - object_storage_operation_counts
-      - object_or_file_copy_movement_records
-      - east_west_internal_flow_bytes
-      - data_center_interconnect_wan_usage
-      - scaleout_port_tx_rx_bytes_packets
-    derived_signals:
-      - storage_staging_window
-      - checkpoint_size_consistency
-    time_alignment: "Storage-operation intervals must overlap the suspicious storage/fabric activity they explain."
-    logic: >
-      Backup, restore, rebuild, replication, migration, or disaster-recovery
-      records can explain high storage writes, reads, metadata storms, internal
-      flows, or WAN traffic that otherwise look like checkpointing or staging.
+  - id: hpc_mpi_alternative_screen
+    purpose: sparse_hpc_mpi_alternative
+    raw_feature_budget: 2
+    required_feature_sets:
+      any_one_of:
+        - [scaleout_port_tx_rx_bytes_packets, tensor_matrix_mxu_neuron_or_engine_active_fraction]
+        - [scaleout_port_tx_rx_bytes_packets, generic_achieved_operation_rate]
+        - [scaleout_port_tx_rx_bytes_packets, accelerator_busy_or_utilization_fraction]
+        - [local_interconnect_tx_rx_bytes, tensor_matrix_mxu_neuron_or_engine_active_fraction]
+        - [fabric_port_device_sample_counters, generic_achieved_operation_rate]
+    emitted_statement:
+      label: hpc_mpi_alternative_screen
+      category: benchmark_hpc_alternative
+      max_confidence: weak
+      statement: "Fabric cadence and accelerator activity can also match HPC or MPI-style workloads; checkpoint or model-lifecycle support is needed before training promotion."
     trigger:
-      type: explanation_threshold_logic
-      evaluation_window: suspicious_storage_or_fabric_window
-      portability: strong
-      source_refs: [S31, S32, S33, S34, S35]
+      type: two_feature_fabric_activity_hpc_alternative_logic
+      evaluation_window: fabric_activity_overlap_window
       conditions:
         all:
-          - metric: storage_operation_intervals.operation_type
-            op: in
-            value_ref: explanatory_storage_operation_types
-          - metric: storage_operation_overlap_fraction
+          - metric: sparse_fabric_cadence_score
             op: ">="
-            value_ref: min_storage_operation_overlap_fraction
-          - metric: bytes_explained_fraction
+            value_ref: min_sparse_hpc_fabric_cadence_score
+          - metric: sparse_activity_score
             op: ">="
-            value_ref: min_bytes_explained_fraction
-        any:
-          - metric: storage_staging_window.normalized_staging_score
+            value_ref: min_sparse_hpc_activity_score
+          - metric: fabric_activity_overlap_fraction
             op: ">="
-            value_ref: min_storage_activity_score
-          - metric: high_fabric_or_internal_flow_score
-            op: ">="
-            value_ref: min_fabric_activity_score
-      score_effect:
-        training_core_confidence_delta: -1
-        explanation_priority: high
-        suppresses_rules:
-          - checkpoint_training_signature
-          - storage_staging_support
-          - collective_cadence_training
-        suppresses_confidence_at_or_above: medium
+            value_ref: min_sparse_hpc_overlap_fraction
       calibration_defaults:
-        - name: explanatory_storage_operation_types
-          value: [backup, restore, rebuild, replication, migration, disaster_recovery, snapshot, etl_export]
-          unit: categorical_set
-          evidence_status: source_informed
-          rationale: "Explicit operation labels are direct explanations for storage and internal-network movement."
-          counterevidence_or_failure_modes: ["operation labels can be broad and overlap real training"]
-          calibration_note: "Normalize local operation labels to this set."
-        - name: min_storage_operation_overlap_fraction
-          value: 0.80
-          unit: fraction
-          evidence_status: calibration_default
-          rationale: "Operation interval should cover most suspicious activity to explain it."
-          counterevidence_or_failure_modes: ["coarse operation intervals can over-explain unrelated activity"]
-          calibration_note: "Calibrate with operation start/end accuracy."
-        - name: min_bytes_explained_fraction
-          value: 0.70
-          unit: fraction
-          evidence_status: calibration_default
-          rationale: "Most bytes should be attributable to the benign storage operation before suppressing training evidence."
-          counterevidence_or_failure_modes: ["byte attribution can be approximate on shared storage"]
-          calibration_note: "Replace with storage accounting or object movement records."
-        - name: min_storage_activity_score
-          value: 0.50
-          unit: score_0_to_1
-          evidence_status: calibration_default
-          rationale: "Only material storage activity should be explained by this support rule."
-          counterevidence_or_failure_modes: ["small but training-critical checkpoints can be below this"]
-          calibration_note: "Tune by local storage baselines."
-        - name: min_fabric_activity_score
-          value: 0.50
-          unit: score_0_to_1
-          evidence_status: calibration_default
-          rationale: "Storage explanation can also apply to fabric/internal flow bursts."
-          counterevidence_or_failure_modes: ["accelerator collectives can coexist with storage traffic"]
-          calibration_note: "Calibrate by network segmentation and storage-fabric routes."
-    output_fields:
-      - storage_explanation_label
-      - operation_type
-      - bytes_moved
-      - explained_activity_channels
-      - unexplained_residual
-    confidence_label: likely
-    source_refs: [S31, S32, S33, S34, S35]
-
-  - id: hpc_mpi_collective_alternative
-    purpose: false_positive_filter
-    required_features:
-      - scaleout_port_tx_rx_bytes_packets
-    optional_features:
-      - local_interconnect_tx_rx_bytes
-      - fabric_port_device_sample_counters
-      - rdma_congestion_retry_drop_error_counters
-      - tensor_matrix_mxu_neuron_or_engine_active_fraction
-      - generic_achieved_operation_rate
-      - accelerator_busy_or_utilization_fraction
-      - allocated_accelerator_count_by_sku
-      - compute_running_intervals
-      - storage_write_operation_bytes
-      - object_storage_operation_counts
-      - load_balancer_gateway_flow_activity
-    derived_signals:
-      - collective_cadence_score
-      - fabric_compute_time_alignment
-      - non_serving_score
-    time_alignment: "Evaluate HPC/MPI alternatives over the same fabric, compute, and allocation window."
-    logic: >
-      HPC simulations and MPI collectives can produce stable participant sets,
-      high accelerator activity, and collective-like traffic. Require checkpoint
-      or model-development support before promoting a fabric-heavy candidate to
-      strong training evidence.
-    trigger:
-      type: counterevidence_threshold_logic
-      evaluation_window: candidate_fabric_activity_window
-      portability: weak
-      source_refs: [S11, S15, S16, S17, S25]
-      conditions:
-        all:
-          - metric: hpc_collective_similarity_score
-            op: ">="
-            value_ref: min_hpc_collective_similarity_score
-          - metric: collective_cadence_score.cadence_score
-            op: ">="
-            value_ref: min_collective_cadence_for_hpc_alternative
-          - metric: non_serving_score.non_serving_score
-            op: ">="
-            value_ref: min_non_serving_score_for_hpc_alternative
-          - metric: checkpoint_periodicity_score.periodicity_score
-            op: "<="
-            value_ref: max_checkpoint_support_score_for_hpc_alternative
-        any:
-          - metric: domain_runtime_or_queue_hpc_score
-            op: ">="
-            value_ref: min_hpc_context_score
-          - metric: fabric_compute_time_alignment.overlap_fraction
-            op: ">="
-            value_ref: min_hpc_fabric_compute_overlap_fraction
-      score_effect:
-        training_core_confidence_delta: -1
-        explanation_priority: medium
-        suppresses_rules:
-          - collective_cadence_training
-        suppresses_confidence_at_or_above: strong
-      calibration_defaults:
-        - name: min_hpc_collective_similarity_score
-          value: 0.70
+        - name: min_sparse_hpc_fabric_cadence_score
+          value: 0.60
           unit: score_0_to_1
           evidence_status: mechanism_inferred
-          rationale: "HPC/MPI alternatives can share stable participants, collectives, and high compute."
-          counterevidence_or_failure_modes: ["model training and HPC traces can be difficult to separate without logs or artifacts"]
-          calibration_note: "Calibrate with local HPC/MPI and training traces."
-        - name: min_collective_cadence_for_hpc_alternative
-          value: 0.65
-          unit: score_0_to_1
-          evidence_status: calibration_default
-          rationale: "HPC alternative should have collective-like behavior over the same window."
-          counterevidence_or_failure_modes: ["some HPC jobs are not collective-heavy"]
-          calibration_note: "Tune by local HPC workload mix."
-        - name: min_non_serving_score_for_hpc_alternative
+          source_refs: [S11, S15, S16, S17, S25]
+          rationale: "HPC/MPI and distributed training can both produce collective-like fabric cadence."
+          counterevidence_or_failure_modes:
+            - "without domain/runtime context the alternative remains weak"
+          calibration_note: "Calibrate with local HPC, MPI, benchmark, and training traces."
+        - name: min_sparse_hpc_activity_score
           value: 0.50
           unit: score_0_to_1
           evidence_status: calibration_default
-          rationale: "HPC jobs often look non-serving, so non-serving shape alone should not promote training."
-          counterevidence_or_failure_modes: ["offline training also looks non-serving"]
-          calibration_note: "Calibrate with non-serving workload classes."
-        - name: max_checkpoint_support_score_for_hpc_alternative
-          value: 0.30
-          unit: score_0_to_1
-          evidence_status: calibration_default
-          rationale: "HPC explanation is stronger when checkpoint/model-state support is weak."
-          counterevidence_or_failure_modes: ["HPC also checkpoints; training can lack visible checkpoints"]
-          calibration_note: "Tune with domain checkpoint behavior."
-        - name: min_hpc_context_score
-          value: 0.60
-          unit: score_0_to_1
-          evidence_status: project_assumption
-          rationale: "Infrastructure-visible queue, image, account, or container context can support HPC alternative without depending on client semantic labels alone."
-          counterevidence_or_failure_modes: ["metadata can be absent or ambiguous"]
-          calibration_note: "Use only context fields allowed by monitoring policy."
-        - name: min_hpc_fabric_compute_overlap_fraction
-          value: 0.60
+          source_refs: [S07, S08, S36, S37, S38, S39]
+          rationale: "HPC alternative should overlap material accelerator activity."
+          counterevidence_or_failure_modes:
+            - "communication-only tests can have lower accelerator activity"
+          calibration_note: "Tune by workload class and accelerator family."
+        - name: min_sparse_hpc_overlap_fraction
+          value: 0.50
           unit: fraction
           evidence_status: calibration_default
-          rationale: "HPC collective alternatives should align fabric and compute activity."
-          counterevidence_or_failure_modes: ["distributed training also aligns fabric and compute"]
-          calibration_note: "Calibrate by workload trace library."
-    output_fields:
-      - hpc_alternative_label
-      - collective_similarity
-      - missing_training_support
-      - review_reason
-    confidence_label: likely
-    source_refs: [S11, S15, S16, S17, S25]
+          source_refs: [S11, S15, S16, S17]
+          rationale: "Fabric and compute should overlap materially before routing to HPC/MPI alternative review."
+          counterevidence_or_failure_modes:
+            - "coarse telemetry can create false overlap"
+          calibration_note: "Replace with source-specific clock alignment and aggregation behavior."
+    score_effect:
+      training_core_confidence_delta: 0
+      support_score_cap: 0.45
+      explanation_priority: medium
+      suppresses_confidence_at_or_above: medium_only_when_checkpoint_support_missing
+    routing_effect:
+      route_to: hpc_or_mpi_review
+      missing_joins_to_report: [checkpoint_identity_shape, serving_counterevidence, domain_runtime_context]
+    false_positive_or_limitations:
+      - "HPC/MPI alternative is a routing screen, not a definitive label."
+    cannot_conclude: [not_training, hpc]
+    source_refs: [S07, S08, S11, S15, S16, S17, S25, S36, S37, S38, S39]
+
+  - id: lifecycle_restart_or_preemption_context_screen
+    purpose: sparse_lifecycle_operational_context
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [resource_container_lifecycle_events]
+        - [allocation_preemption_events]
+        - [maintenance_operation_intervals]
+    emitted_statement:
+      label: lifecycle_restart_or_preemption_context_screen
+      category: lifecycle_operational_context
+      max_confidence: screen
+      statement: "Lifecycle, preemption, or maintenance events can explain starts, restarts, fragmented activity, checkpoint bursts, or telemetry gaps."
+    trigger:
+      type: one_feature_lifecycle_context_logic
+      evaluation_window: lifecycle_or_preemption_event_window
+      conditions:
+        any:
+          - metric: lifecycle_event_count
+            op: ">="
+            value_ref: min_lifecycle_event_count_to_emit
+          - metric: preempted_resource_count
+            op: ">="
+            value_ref: min_preempted_resource_count_to_emit
+          - metric: affected_asset_count
+            op: ">="
+            value_ref: min_lifecycle_maintenance_affected_assets
+      calibration_defaults:
+        - name: min_lifecycle_event_count_to_emit
+          value: 1
+          unit: events
+          evidence_status: source_backed
+          source_refs: [S21, S22, S38]
+          rationale: "Any source-emitted lifecycle event can bound candidate windows or explain fragmented activity."
+          counterevidence_or_failure_modes:
+            - "generic lifecycle events may be unrelated to accelerator work"
+          calibration_note: "Normalize event reasons and container-to-resource mapping."
+        - name: min_preempted_resource_count_to_emit
+          value: 1
+          unit: resources
+          evidence_status: source_informed
+          source_refs: [S18, S21, S22]
+          rationale: "Preemption of any accelerator-relevant resource can explain restarts or checkpoint bursts."
+          counterevidence_or_failure_modes:
+            - "preemption records can refer to CPU or non-accelerator resources"
+          calibration_note: "Map resource_type to accelerator and workload scope."
+        - name: min_lifecycle_maintenance_affected_assets
+          value: 1
+          unit: assets
+          evidence_status: source_informed
+          source_refs: [S18, S40, S41]
+          rationale: "Maintenance affecting one mapped asset can explain gaps or restarts in sparse telemetry."
+          counterevidence_or_failure_modes:
+            - "broad maintenance intervals can over-explain unrelated events"
+          calibration_note: "Join maintenance asset categories to cluster, storage, power, and fabric scopes."
+    score_effect:
+      training_core_confidence_delta: 0
+      support_score_cap: 0.30
+      explanation_priority: medium
+    routing_effect:
+      route_to: lifecycle_explanation_join
+      missing_joins_to_report: [compute_window, checkpoint_write_window, telemetry_coverage_fraction]
+    false_positive_or_limitations:
+      - "Lifecycle context explains timing but does not identify workload type."
+    cannot_conclude: [training, no_training]
+    source_refs: [S18, S21, S22, S38, S40, S41]

@@ -1,506 +1,1011 @@
-schema_version: "0.2"
+schema_version: "0.1"
 created: "2026-05-16"
 source_inventory: observables/observables.yaml
-status: concrete_algorithm_rule_spec
+status: sparse_first_algorithm_rule_spec
 
-capability_policy:
-  policy_threshold_operations:
-    value: 1.0e25
-    unit: operations
-    evidence_status: source_backed
-    source_refs: [S01, S03]
-    rationale: "Policy review scale for large compute; not a workload identity classifier."
-    counterevidence_or_failure_modes:
-      - "large inference, synthetic data generation, benchmarks, and HPC can cross the same compute threshold"
-    calibration_note: "Replace only when the governing policy threshold changes."
-  comparison_uncertainty_margin:
-    value: 0.10
-    unit: ratio
-    evidence_status: calibration_default
-    source_refs: [S04, S05, S06, S07, S08, S09, S24]
-    rationale: "Executable default for unit, clock, aggregation, and scope uncertainty in capacity comparisons."
-    counterevidence_or_failure_modes:
-      - "operation-unit mismatch or hidden capacity can dominate this margin"
-    calibration_note: "Replace with source-specific measurement uncertainty."
-  positive_activity_policy: >
-    Advertised peak rates may be used for conservative capacity upper bounds.
-    They must not be used as positive achieved-work lower bounds unless the
-    rule explicitly marks the result as a calibrated activity proxy.
+purpose: >
+  Sparse capacity and capability screens for settings where only one or two raw
+  observable feature families are present. These rules emit narrow capacity,
+  availability, topology, power-service, or policy-scale feasibility statements.
+  They do not emit workload identity or achieved-work labels.
+
+scope_policy:
+  trusted_local_inputs: "Only raw feature IDs from observables/observables.yaml are used as inputs."
+  relationship_to_aggregation_rules: >
+    This file supplies sparse capacity facts and screens for the public
+    aggregation layer. Strong rule-out claims are made by derived capacity
+    bounds plus `aggregation_rules.yaml`, not by single sparse screens.
+  sparse_claim_policy: >
+    A sparse capacity rule may say that an observed feature is compatible with,
+    limits, or routes review of threshold-scale capacity. It must not say that
+    work occurred, that training occurred, or that no hidden/out-of-scope
+    capacity exists.
+
+sparse_label_semantics:
+  capacity_screen:
+    meaning: "A sparse feature is relevant to capacity or physical feasibility."
+    max_confidence: screen
+    can_emit_training_label_by_itself: false
+  availability_screen:
+    meaning: "A sparse state changes whether capacity was available during the scoped window."
+    max_confidence: weak
+    can_emit_training_label_by_itself: false
+  capacity_limit_screen:
+    meaning: "A sparse feature can limit or reduce a capacity hypothesis, but cannot alone certify impossibility unless coverage and scope are established elsewhere."
+    max_confidence: weak
+    can_emit_training_label_by_itself: false
+  policy_scale_screen:
+    meaning: "A sparse capacity value is compatible or incompatible with a policy-scale compute hypothesis under optimistic assumptions."
+    max_confidence: weak
+    can_emit_training_label_by_itself: false
+
+capacity_categories:
+  - id: capacity_count_or_shape
+    name: Accelerator count or cloud shape
+    algorithm_treatment: "Use as a first-pass capacity and scope screen; join with peak rate, duration, and activity before stronger conclusions."
+    rule_ids:
+      - accelerator_count_capacity_screen
+      - instance_shape_capacity_screen
+  - id: capacity_peak_rate
+    name: Advertised peak rate
+    algorithm_treatment: "Use only for upper-bound or threshold-time math; never as achieved activity."
+    rule_ids:
+      - peak_rate_capacity_screen
+  - id: capacity_memory
+    name: Memory capacity and bandwidth
+    algorithm_treatment: "Use as large-model context and memory-capability screening, not training identity."
+    rule_ids:
+      - memory_capacity_model_context_screen
+      - memory_bandwidth_capacity_screen
+  - id: capacity_topology
+    name: Local, scale-out, and cross-site topology
+    algorithm_treatment: "Use to establish whether distributed synchronized work is physically plausible."
+    rule_ids:
+      - local_interconnect_capacity_screen
+      - scaleout_domain_capacity_screen
+      - cross_site_connectivity_capacity_screen
+  - id: capacity_availability
+    name: Partition, reservation, running, health, and maintenance availability
+    algorithm_treatment: "Use to reduce, bound, or route capacity availability over time."
+    rule_ids:
+      - partition_capacity_screen
+      - health_availability_screen
+      - reservation_capacity_screen
+      - quota_capacity_limit_screen
+      - running_accelerator_hours_screen
+      - reservation_billing_capacity_screen
+      - maintenance_availability_screen
+  - id: capacity_power_service
+    name: Power, clocks, electrical service, and installation
+    algorithm_treatment: "Use to bound physical feasibility and cap-adjusted capacity."
+    rule_ids:
+      - power_clock_cap_screen
+      - electrical_service_capacity_screen
+      - installation_timeline_capacity_screen
+  - id: capacity_policy_scale
+    name: Policy-scale possibility screens
+    algorithm_treatment: "Use as sparse policy-scale triage; derived upper bounds and aggregation gates are required for strong rule-out claims."
+    rule_ids:
+      - accelerator_count_capacity_screen
+      - peak_rate_capacity_screen
+      - running_accelerator_hours_screen
+
+rule_category_membership:
+  membership_policy: >
+    Categories are evidentiary roles. Each sparse capacity rule has exactly one
+    primary category for default routing and may list additional categories for
+    scoring or joins.
+  rules:
+    - rule_id: accelerator_count_capacity_screen
+      primary_category: capacity_count_or_shape
+      additional_categories: [capacity_policy_scale]
+    - rule_id: instance_shape_capacity_screen
+      primary_category: capacity_count_or_shape
+      additional_categories: [capacity_policy_scale]
+    - rule_id: peak_rate_capacity_screen
+      primary_category: capacity_peak_rate
+      additional_categories: [capacity_policy_scale]
+    - rule_id: memory_capacity_model_context_screen
+      primary_category: capacity_memory
+      additional_categories: []
+    - rule_id: memory_bandwidth_capacity_screen
+      primary_category: capacity_memory
+      additional_categories: []
+    - rule_id: local_interconnect_capacity_screen
+      primary_category: capacity_topology
+      additional_categories: []
+    - rule_id: scaleout_domain_capacity_screen
+      primary_category: capacity_topology
+      additional_categories: [capacity_policy_scale]
+    - rule_id: cross_site_connectivity_capacity_screen
+      primary_category: capacity_topology
+      additional_categories: []
+    - rule_id: partition_capacity_screen
+      primary_category: capacity_availability
+      additional_categories: []
+    - rule_id: power_clock_cap_screen
+      primary_category: capacity_power_service
+      additional_categories: [capacity_availability]
+    - rule_id: health_availability_screen
+      primary_category: capacity_availability
+      additional_categories: [capacity_power_service]
+    - rule_id: reservation_capacity_screen
+      primary_category: capacity_availability
+      additional_categories: [capacity_policy_scale]
+    - rule_id: quota_capacity_limit_screen
+      primary_category: capacity_availability
+      additional_categories: [capacity_policy_scale]
+    - rule_id: running_accelerator_hours_screen
+      primary_category: capacity_availability
+      additional_categories: [capacity_policy_scale]
+    - rule_id: reservation_billing_capacity_screen
+      primary_category: capacity_availability
+      additional_categories: []
+    - rule_id: electrical_service_capacity_screen
+      primary_category: capacity_power_service
+      additional_categories: [capacity_policy_scale]
+    - rule_id: installation_timeline_capacity_screen
+      primary_category: capacity_power_service
+      additional_categories: [capacity_policy_scale]
+    - rule_id: maintenance_availability_screen
+      primary_category: capacity_availability
+      additional_categories: [capacity_power_service]
 
 capability_rules:
-  - id: cap_capacity_upper_bound_flop
-    purpose: capacity_upper_bound
-    required_features:
-      - accelerator_count_by_family_sku
-      - advertised_peak_rate_by_precision
-    optional_features:
-      - instance_type_shape_machine_type
-      - allocated_accelerator_count_by_sku
-      - compute_running_intervals
-      - accelerator_compute_billing_usage_intervals
-      - accelerator_partitioning_intervals
-      - accelerator_power_cap_watts
-      - accelerator_core_clock_hz
-      - accelerator_memory_clock_hz
-      - accelerator_p_state
-      - accelerator_throttle_state
-      - accelerator_performance_limit_state
-      - accelerator_power_limit_active
-      - accelerator_thermal_limit_active
-      - accelerator_health_error_state
-      - maintenance_operation_intervals
-      - utility_interconnection_status_intervals
-      - electrical_service_status_intervals
-      - asset_receiving_installation_events
-    derived_signals:
-      - capacity_upper_bound_flop
-      - available_accelerator_fraction
-      - cap_clock_power_factor
-      - clock_aligned_overlap_window
-    time_alignment: "Integrate only over windows where inventory/shape, peak rate, availability, and physical service validity overlap."
-    formula: >
-      C_capacity_upper(W) = integral_W sum_sku count_sku(t) *
-      R_peak_sku_precision(t) * available_accelerator_fraction_sku(t) *
-      cap_clock_power_factor_sku(t) dt.
-    concrete_computation:
-      type: interval_integration_upper_bound
-      source_refs: [S01, S03, S04, S05, S06, S07, S08, S09, S23, S24, S26, S35, S40, S41]
-      evidence_status: source_informed
-      time_segmentation:
-        split_at:
-          - inventory_count_validity_boundary
-          - advertised_peak_rate_validity_boundary
-          - partition_interval_boundary
-          - power_cap_or_clock_sample_boundary
-          - health_or_throttle_state_boundary
-          - topology_or_maintenance_boundary
-          - cloud_running_quota_or_reservation_boundary
-          - electrical_service_or_installation_boundary
-      per_segment_formula: |
-        segment_capacity_operations =
-          segment_seconds *
-          sum_sku_precision(
-            effective_count_sku *
-            advertised_peak_rate_by_precision_ops_per_second *
-            available_accelerator_fraction *
-            cap_clock_power_factor *
-            topology_domain_factor *
-            cloud_or_service_scope_factor
-          )
-        capacity_upper_bound_operations = sum(segment_capacity_operations)
-      validation_checks:
-        - "Peak rate must be source-backed for the exact SKU/instance type and precision_or_mode; otherwise emit missing_peak_rate and exclude strong negative conclusions."
-        - "available_accelerator_fraction must be computed on the same monitored scope as the claim or audit window."
-        - "cap_clock_power_factor may reduce capacity only for intervals where caps, clocks, or limit states overlap the segment."
-        - "cloud quotas and reservations cap capacity only when enforced and scope-matched."
-        - "electrical and installation constraints can set available fraction to zero before commissioning/energized service unless alternate capacity is documented."
-      output_constraints:
-        - "This is an upper bound for ruling out or sanity-checking claims, not evidence that work occurred."
-        - "Do not multiply advertised peak by utilization to create a strong achieved lower bound unless the proxy is calibrated and labeled."
-      comparison_defaults:
+  - id: accelerator_count_capacity_screen
+    purpose: sparse_capacity_count_screen
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [accelerator_count_by_family_sku]
+    emitted_statement:
+      label: accelerator_count_threshold_capacity_screen
+      category: capacity_count_or_shape
+      max_confidence: screen
+      statement: "Observed installed or provisioned accelerator count is a sparse capacity fact; it is compatible with threshold-scale compute only under SKU, duration, precision, availability, and topology assumptions."
+    trigger:
+      type: one_feature_capacity_count_logic
+      evaluation_window: inventory_validity_window
+      conditions:
+        all:
+          - metric: observed_accelerator_count
+            op: ">="
+            value_ref: min_count_to_emit_capacity_fact
+        any:
+          - metric: observed_accelerator_count
+            op: ">="
+            value_ref: min_accelerator_count_policy_scale_screen
+          - metric: count_only_threshold_time_unknown
+            op: "=="
+            value: true
+      calibration_defaults:
+        - name: min_count_to_emit_capacity_fact
+          value: 1
+          unit: accelerators
+          evidence_status: source_backed
+          source_refs: [S07, S09, S19, S20, S24]
+          rationale: "A directly observed nonzero accelerator count is already useful as a capacity fact."
+          counterevidence_or_failure_modes:
+            - "inventory can include failed, partitioned, powered-off, or out-of-scope devices"
+          calibration_note: "Replace only if the collection policy suppresses small counts."
+        - name: min_accelerator_count_policy_scale_screen
+          value: 1024
+          unit: accelerators
+          evidence_status: calibration_default
+          source_refs: [S01, S03, S04, S05, S06, S24]
+          rationale: "Executable optimistic screen for policy-scale review; true threshold depends on SKU peak rate, window length, precision, and available fraction."
+          counterevidence_or_failure_modes:
+            - "slow SKUs, short windows, or heavy partitioning can be insufficient above this count"
+            - "small counts can still reach the policy threshold over long enough windows"
+          calibration_note: "Replace with SKU/time-window-specific capacity_upper_bound_flop."
+    false_positive_or_limitations:
+      - "Count alone does not show activity."
+      - "Count alone cannot rule out hidden or out-of-scope capacity."
+    cannot_conclude: [activity, achieved_compute, training, no_threshold_run]
+    promotion_policy: "Promote to `capacity_upper_bound_flop` and the capacity gate when peak rate, availability, and time-window features are present."
+    source_refs: [S01, S03, S04, S05, S06, S07, S09, S19, S20, S24]
+
+  - id: instance_shape_capacity_screen
+    purpose: sparse_cloud_shape_capacity_screen
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [instance_type_shape_machine_type]
+    emitted_statement:
+      label: cloud_shape_capacity_screen
+      category: capacity_count_or_shape
+      max_confidence: screen
+      statement: "Cloud instance or machine shape implies an accelerator count/type capacity fact when provider shape mapping is source-backed."
+    trigger:
+      type: one_feature_shape_capacity_logic
+      evaluation_window: shape_validity_window
+      conditions:
+        all:
+          - metric: shape_accelerator_count
+            op: ">="
+            value_ref: min_shape_accelerator_count_to_emit
+          - metric: provider_shape_mapping_confidence
+            op: ">="
+            value_ref: min_provider_shape_mapping_confidence
+      calibration_defaults:
+        - name: min_shape_accelerator_count_to_emit
+          value: 1
+          unit: accelerators
+          evidence_status: source_backed
+          source_refs: [S23, S24]
+          rationale: "A provider shape with at least one accelerator is a capacity input."
+          counterevidence_or_failure_modes:
+            - "shape records can be stale or not scoped to a running interval"
+          calibration_note: "Use provider SKU tables and local shape-normalization logic."
+        - name: min_provider_shape_mapping_confidence
+          value: 0.80
+          unit: score_0_to_1
+          evidence_status: source_informed
+          source_refs: [S23, S24, S35]
+          rationale: "Provider shape mapping should be source-backed before using it as a capacity screen."
+          counterevidence_or_failure_modes:
+            - "custom bare-metal or preview shapes can be absent from lookup tables"
+          calibration_note: "Replace with provider-specific shape lookup coverage."
+    false_positive_or_limitations:
+      - "Shape validity does not mean the instance was running or doing work."
+      - "Cloud shape capacity can be constrained by reservation, quota, placement, or billing scope."
+    cannot_conclude: [activity, achieved_compute, training]
+    promotion_policy: "Join with compute_running_intervals or billing intervals for use-over-time facts, and with peak rate for upper bounds."
+    source_refs: [S23, S24, S35]
+
+  - id: peak_rate_capacity_screen
+    purpose: sparse_peak_rate_upper_bound_screen
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [advertised_peak_rate_by_precision]
+    emitted_statement:
+      label: advertised_peak_rate_capacity_screen
+      category: capacity_peak_rate
+      max_confidence: screen
+      statement: "Source-backed advertised peak rate can support optimistic upper-bound math, but it is not achieved activity."
+    trigger:
+      type: one_feature_peak_rate_logic
+      evaluation_window: peak_rate_validity_window
+      conditions:
+        all:
+          - metric: advertised_peak_rate_ops_per_second
+            op: ">="
+            value_ref: min_nonzero_peak_rate_ops_per_second
+          - metric: precision_or_mode_normalized
+            op: "=="
+            value: true
+        compute:
+          - metric: optimistic_seconds_to_policy_threshold
+            formula: "policy_threshold_operations / advertised_peak_rate_ops_per_second"
+      calibration_defaults:
+        - name: min_nonzero_peak_rate_ops_per_second
+          value: 1
+          unit: operations_per_second
+          evidence_status: source_backed
+          source_refs: [S04, S05, S06, S24]
+          rationale: "Any source-backed positive peak rate is usable for upper-bound arithmetic."
+          counterevidence_or_failure_modes:
+            - "incorrect precision/mode normalization can inflate capacity"
+          calibration_note: "Use source-backed SKU and precision/mode mappings."
         - name: policy_threshold_operations
           value: 1.0e25
           unit: operations
           evidence_status: source_backed
           source_refs: [S01, S03]
-          rationale: "Policy threshold used for large-compute review."
-          counterevidence_or_failure_modes: ["the threshold does not classify workload type"]
-          calibration_note: "Replace only if policy changes."
-        - name: exceedance_uncertainty_margin
-          value: 0.10
-          unit: ratio
-          evidence_status: calibration_default
-          source_refs: [S04, S05, S06, S07, S08, S09, S24]
-          rationale: "Default margin for flagging achieved/claimed compute above capacity."
-          counterevidence_or_failure_modes: ["unit mismatch, aggregation, and hidden capacity can exceed this"]
-          calibration_note: "Replace with source-specific uncertainty."
-        - name: unknown_cap_clock_power_factor_for_upper_bound
-          value: 1.0
-          unit: fraction
+          rationale: "Policy review scale for large compute; not a workload identity threshold."
+          counterevidence_or_failure_modes:
+            - "the policy threshold does not distinguish training from other large compute"
+          calibration_note: "Replace only if the governing policy threshold changes."
+    false_positive_or_limitations:
+      - "Advertised peak is an upper bound, not measured use."
+      - "Sustained training efficiency can be far below peak."
+    cannot_conclude: [activity, achieved_compute, training]
+    promotion_policy: "Promote to `capacity_upper_bound_flop` and the capacity gate when count and time-window features are present."
+    source_refs: [S01, S03, S04, S05, S06, S24]
+
+  - id: memory_capacity_model_context_screen
+    purpose: sparse_memory_capacity_screen
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [memory_capacity_bytes]
+    emitted_statement:
+      label: large_model_memory_capacity_context_screen
+      category: capacity_memory
+      max_confidence: screen
+      statement: "Device memory capacity is compatible with some large-model residency classes, but memory capacity alone does not indicate training."
+    trigger:
+      type: one_feature_memory_capacity_logic
+      evaluation_window: memory_capacity_sample_window
+      conditions:
+        all:
+          - metric: device_memory_capacity_bytes
+            op: ">="
+            value_ref: min_large_model_context_memory_bytes
+      calibration_defaults:
+        - name: min_large_model_context_memory_bytes
+          value: 80000000000
+          unit: bytes
+          evidence_status: source_informed
+          source_refs: [S04, S05, S06]
+          rationale: "Modern high-end training accelerators expose tens to hundreds of GB of device memory; 80 GB is an executable large-memory context screen."
+          counterevidence_or_failure_modes:
+            - "large inference and vector databases can also require high memory"
+            - "small or adapter fine-tuning can run below this memory class"
+          calibration_note: "Replace with local model-size, precision, sharding, and accelerator-memory distributions."
+    false_positive_or_limitations:
+      - "Memory capacity is hardware context, not workload evidence."
+    cannot_conclude: [activity, training, model_size]
+    promotion_policy: "Join with hbm_or_device_memory_used and checkpoint-size evidence for large-model context support."
+    source_refs: [S04, S05, S06]
+
+  - id: memory_bandwidth_capacity_screen
+    purpose: sparse_memory_bandwidth_screen
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [memory_bandwidth_bytes_per_sec]
+    emitted_statement:
+      label: memory_bandwidth_capacity_screen
+      category: capacity_memory
+      max_confidence: screen
+      statement: "Source-reported memory bandwidth is a hardware capability fact that may support memory-bound model-workload plausibility."
+    trigger:
+      type: one_feature_memory_bandwidth_logic
+      evaluation_window: memory_bandwidth_sample_window
+      conditions:
+        all:
+          - metric: memory_bandwidth_bytes_per_sec
+            op: ">="
+            value_ref: min_high_bandwidth_context_bytes_per_sec
+      calibration_defaults:
+        - name: min_high_bandwidth_context_bytes_per_sec
+          value: 1000000000000
+          unit: bytes_per_second
+          evidence_status: source_informed
+          source_refs: [S04, S05, S06]
+          rationale: "A 1 TB/s screen separates high-bandwidth accelerator memory classes from ordinary host memory, while remaining below current top-end published bandwidth."
+          counterevidence_or_failure_modes:
+            - "memory bandwidth capability does not imply memory activity"
+            - "bandwidth needs vary sharply by model architecture and precision"
+          calibration_note: "Replace with accelerator-family capability lookup and workload memory-intensity baselines."
+    false_positive_or_limitations:
+      - "Capability alone does not prove memory-bound activity."
+    cannot_conclude: [activity, achieved_compute, training]
+    promotion_policy: "Join with memory_bandwidth_or_dram_active for support, or with SKU capability for upper bounds."
+    source_refs: [S04, S05, S06]
+
+  - id: local_interconnect_capacity_screen
+    purpose: sparse_local_topology_capacity_screen
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [local_accelerator_interconnect_domain]
+    emitted_statement:
+      label: local_dense_interconnect_capacity_screen
+      category: capacity_topology
+      max_confidence: screen
+      statement: "A local accelerator interconnect domain exists and may make intra-node synchronized work plausible."
+    trigger:
+      type: one_feature_local_interconnect_logic
+      evaluation_window: local_interconnect_validity_window
+      conditions:
+        all:
+          - metric: local_fabric_device_count
+            op: ">="
+            value_ref: min_local_fabric_device_count
+          - metric: local_fabric_bandwidth_gbps
+            op: ">="
+            value_ref: min_local_fabric_bandwidth_gbps
+      calibration_defaults:
+        - name: min_local_fabric_device_count
+          value: 2
+          unit: devices
           evidence_status: mechanism_inferred
-          source_refs: [S07, S08, S09]
-          rationale: "Unknown caps are not assumed to reduce an upper bound."
-          counterevidence_or_failure_modes: ["undocumented caps can make the upper bound too high"]
-          calibration_note: "Replace with measured cap/clock source completeness."
-        - name: default_topology_domain_factor_for_upper_bound
-          value: 1.0
-          unit: fraction
+          source_refs: [S04, S05, S06, S11]
+          rationale: "At least two locally connected accelerators are needed for local accelerator collectives or peer movement."
+          counterevidence_or_failure_modes:
+            - "single-accelerator training and CPU-hosted communication remain possible outside this screen"
+          calibration_note: "Replace with hardware topology and local workload requirements."
+        - name: min_local_fabric_bandwidth_gbps
+          value: 100
+          unit: gigabits_per_second
+          evidence_status: calibration_default
+          source_refs: [S04, S05, S06]
+          rationale: "Executable low bar for dense accelerator interconnect screening; exact usefulness depends on topology and workload."
+          counterevidence_or_failure_modes:
+            - "PCIe-only or degraded links can still run distributed work slowly"
+          calibration_note: "Calibrate by fabric type and measured peer bandwidth."
+    false_positive_or_limitations:
+      - "Local interconnect supports physical possibility, not activity."
+    cannot_conclude: [distributed_training, fabric_activity, training]
+    promotion_policy: "Join with local_interconnect_tx_rx_bytes and activity for fabric evidence."
+    source_refs: [S04, S05, S06, S11]
+
+  - id: scaleout_domain_capacity_screen
+    purpose: sparse_scaleout_topology_capacity_screen
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [scaleout_fabric_domain_graph]
+    emitted_statement:
+      label: scaleout_distributed_work_capacity_screen
+      category: capacity_topology
+      max_confidence: screen
+      statement: "A connected scale-out fabric domain is large enough to make distributed synchronized work physically plausible."
+    trigger:
+      type: one_feature_scaleout_domain_logic
+      evaluation_window: scaleout_fabric_validity_window
+      conditions:
+        all:
+          - metric: scaleout_node_count
+            op: ">="
+            value_ref: min_scaleout_node_count
+          - metric: scaleout_link_count
+            op: ">="
+            value_ref: min_scaleout_link_count
+          - metric: scaleout_link_bandwidth_gbps
+            op: ">="
+            value_ref: min_scaleout_link_bandwidth_gbps
+      calibration_defaults:
+        - name: min_scaleout_node_count
+          value: 8
+          unit: nodes
           evidence_status: calibration_default
           source_refs: [S11, S15, S16, S17, S25, S42, S43]
-          rationale: "If topology constraints are unknown, retain capacity upper bound but do not issue strong synchronized-training feasibility claims."
-          counterevidence_or_failure_modes: ["unusable topology can overstate synchronized training feasibility"]
-          calibration_note: "Replace with topology-specific effective domain factor."
-        - name: sustained_efficiency_factor_for_positive_proxy
-          value: 0.0
-          unit: fraction
-          evidence_status: project_assumption
-          source_refs: [S07, S08, S36, S37, S38, S39]
-          rationale: "Default forbids deriving positive achieved work from advertised peak without site calibration."
-          counterevidence_or_failure_modes: ["proxy lower bounds may be useful after calibration but are intentionally disabled by default"]
-          calibration_note: "Set only from measured achieved operation counters or validated workload-specific efficiency curves."
-      trigger:
-        type: capacity_bound_threshold_logic
-        evaluation_window: audited_capacity_window
-        conditions:
-          all:
-            - metric: capacity_upper_bound_flop.coverage_fraction
-              op: ">="
-              value_ref: min_capacity_input_coverage_fraction
-            - metric: capacity_upper_bound_flop.capacity_upper_bound_operations
-              op: "<"
-              value_ref: policy_threshold_operations
-        output_label: threshold_scale_run_physically_ruled_out_for_scope
-        confidence: conservative_bound
+          rationale: "Eight nodes is a sparse distributed-work screen, not a policy threshold; it catches topology domains large enough for multi-node collectives."
+          counterevidence_or_failure_modes:
+            - "smaller domains can train smaller models"
+            - "large domains can serve HPC, inference, or benchmarks"
+          calibration_note: "Replace with local topology sizes for training, HPC, inference, and benchmark jobs."
+        - name: min_scaleout_link_count
+          value: 8
+          unit: links
+          evidence_status: calibration_default
+          source_refs: [S25, S42, S43]
+          rationale: "Requires a nontrivial connected fabric surface before emitting scale-out capacity support."
+          counterevidence_or_failure_modes:
+            - "link count can be reported differently across fabrics"
+          calibration_note: "Use graph-derived connected components and fabric-specific link semantics."
+        - name: min_scaleout_link_bandwidth_gbps
+          value: 100
+          unit: gigabits_per_second
+          evidence_status: source_informed
+          source_refs: [S25, S42, S43]
+          rationale: "Low-latency high-throughput fabrics for ML/HPC expose high bandwidth links; 100 Gbps is a conservative executable screen."
+          counterevidence_or_failure_modes:
+            - "bandwidth alone does not imply low latency or correct routing"
+          calibration_note: "Replace with fabric-generation-specific thresholds and bisection bandwidth."
+    false_positive_or_limitations:
+      - "HPC, storage, benchmark, and inference clusters can have the same topology."
+    cannot_conclude: [fabric_activity, collective_cadence, training]
+    promotion_policy: "Join with topology health and participant mapping in derived capacity and aggregation review."
+    source_refs: [S11, S15, S16, S17, S25, S42, S43]
+
+  - id: cross_site_connectivity_capacity_screen
+    purpose: sparse_dci_capacity_screen
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [cross_site_or_dci_connectivity]
+    emitted_statement:
+      label: cross_site_or_dci_capacity_context_screen
+      category: capacity_topology
+      max_confidence: screen
+      statement: "Cross-site or DCI connectivity can support data movement or multi-site context, but low-latency synchronous training plausibility remains unresolved."
+    trigger:
+      type: one_feature_cross_site_connectivity_logic
+      evaluation_window: cross_site_connectivity_sample_window
+      conditions:
+        all:
+          - metric: link_capacity_gbps
+            op: ">="
+            value_ref: min_cross_site_capacity_gbps
+          - metric: service_state
+            op: in
+            value_ref: active_connectivity_states
       calibration_defaults:
-        - name: min_capacity_input_coverage_fraction
-          value: 0.90
+        - name: min_cross_site_capacity_gbps
+          value: 100
+          unit: gigabits_per_second
+          evidence_status: calibration_default
+          source_refs: [S25, S28, S29, S30]
+          rationale: "Executable high-capacity DCI screen for large data movement; exact threshold is provider and route specific."
+          counterevidence_or_failure_modes:
+            - "cross-site capacity can support replication or backups rather than training"
+            - "high bandwidth does not imply low enough latency for synchronous training"
+          calibration_note: "Replace with measured DCI throughput, latency, and route class."
+        - name: active_connectivity_states
+          value: [active, available, in_service, up]
+          unit: categorical_set
+          evidence_status: source_informed
+          source_refs: [S25, S28, S29, S30]
+          rationale: "Only active/up service states should support a connectivity capacity screen."
+          counterevidence_or_failure_modes:
+            - "provider state names vary and can lag actual path availability"
+          calibration_note: "Normalize local service-state labels."
+    false_positive_or_limitations:
+      - "Cross-site connectivity more often supports staging, replication, or federation than tight synchronous training."
+    cannot_conclude: [training, synchronous_training, fabric_activity]
+    promotion_policy: "Join with WAN usage or storage operation records for data movement support or explanations."
+    source_refs: [S25, S28, S29, S30]
+
+  - id: partition_capacity_screen
+    purpose: sparse_partition_capacity_limit_screen
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [accelerator_partitioning_intervals]
+    emitted_statement:
+      label: accelerator_partition_capacity_screen
+      category: capacity_availability
+      max_confidence: weak
+      statement: "Partitioning or sharing state can reduce single-run capacity and changes how accelerator counts map to usable compute and memory."
+    trigger:
+      type: one_feature_partition_logic
+      evaluation_window: partition_interval
+      conditions:
+        any:
+          - metric: inferred_partition_compute_fraction
+            op: "<="
+            value_ref: max_partition_fraction_for_capacity_limit_screen
+          - metric: sharing_mode
+            op: in
+            value_ref: capacity_limiting_sharing_modes
+      calibration_defaults:
+        - name: max_partition_fraction_for_capacity_limit_screen
+          value: 0.50
           unit: fraction
           evidence_status: calibration_default
-          source_refs: [S07, S08, S09, S18, S23, S26, S35, S40, S41]
-          rationale: "Negative capacity conclusions require high coverage of capacity inputs."
-          counterevidence_or_failure_modes: ["missing inventory, quota, or service data can understate capacity"]
-          calibration_note: "Replace with source completeness requirements for the monitored scope."
-    output_fields:
-      - monitored_scope
-      - start_time
-      - end_time
-      - precision_or_mode
-      - capacity_upper_bound_operations
-      - limiting_features
-      - confidence
-    confidence_label: conservative_bound
-    source_refs: [S01, S03, S04, S05, S06, S07, S08, S09, S24]
-
-  - id: cap_accelerator_sku_capability
-    purpose: hardware_capability_lookup
-    required_features:
-      - accelerator_count_by_family_sku
-    optional_features:
-      - instance_type_shape_machine_type
-      - memory_capacity_bytes
-      - memory_bandwidth_bytes_per_sec
-      - advertised_peak_rate_by_precision
-      - local_accelerator_interconnect_domain
-      - scaleout_fabric_domain_graph
-    derived_signals: []
-    time_alignment: "Use capability values whose validity intervals overlap the audited scope/window."
-    formula: >
-      Normalize physical inventory and cloud shapes to SKU, memory class,
-      advertised precision/mode rates, local fabric capability, and scale-out
-      fabric domain membership. Do not infer activity from capability.
-    output_fields:
-      - accelerator_sku
-      - count
-      - memory_capacity_bytes
-      - memory_bandwidth_bytes_per_sec
-      - advertised_peak_rates
-      - topology_context
-      - capability_source
-    confidence_label: certain
-    source_refs: [S04, S05, S06, S07, S08, S09, S19, S20, S24]
-
-  - id: cap_partition_adjustment
-    purpose: capacity_reduction
-    required_features:
-      - accelerator_partitioning_intervals
-    optional_features:
-      - allocated_accelerator_count_by_sku
-      - container_resource_request_quantity
-      - container_resource_limit_quantity
-      - accelerator_count_by_family_sku
-      - hbm_or_device_memory_used
-    derived_signals:
-      - available_accelerator_fraction
-    time_alignment: "Apply partition profile and sharing mode only during the exact partition interval overlap."
-    formula: >
-      Map each partition profile to a calibrated fraction of compute, memory,
-      and interconnect capability. Reduce available capacity for small or shared
-      partitions and preserve the logical-to-physical mapping used by scheduler
-      or container records.
-    output_fields:
-      - partition_type
-      - slice_profile
-      - logical_partition_count
-      - compute_fraction
-      - memory_fraction
-      - visibility_caveats
-    confidence_label: conservative_bound
+          source_refs: [S10, S19, S20]
+          rationale: "Unknown or small partitions should route review because logical accelerator count can overstate full-device training capacity."
+          counterevidence_or_failure_modes:
+            - "some logical partitions can still be sufficient for fine-tuning"
+            - "partition profile names must be mapped per accelerator family"
+          calibration_note: "Replace with MIG, vGPU, device-plugin, or scheduler partition profile lookup."
+        - name: capacity_limiting_sharing_modes
+          value: [shared, time_sliced, mig, vgpu, fractional]
+          unit: categorical_set
+          evidence_status: source_informed
+          source_refs: [S10, S19, S20]
+          rationale: "Shared or fractional modes are capacity context, especially for single large-run hypotheses."
+          counterevidence_or_failure_modes:
+            - "labels vary by source and can mix policy with hardware partitioning"
+          calibration_note: "Normalize local partition and sharing labels."
+    false_positive_or_limitations:
+      - "Partitioning can support many small jobs rather than one large job."
+    cannot_conclude: [no_activity, no_training, no_threshold_run]
+    promotion_policy: "Join with count or allocation features in derived capacity and aggregation review."
     source_refs: [S10, S19, S20]
 
-  - id: cap_power_clock_limit_adjustment
-    purpose: capacity_reduction
-    required_features:
-      - accelerator_power_cap_watts
-      - accelerator_core_clock_hz
-    optional_features:
-      - accelerator_memory_clock_hz
-      - accelerator_p_state
-      - accelerator_throttle_state
-      - accelerator_performance_limit_state
-      - accelerator_power_limit_active
-      - accelerator_thermal_limit_active
-      - power_cap_violation_throttle_state
-      - accelerator_temperature_celsius
-      - inlet_outlet_air_or_coolant_temperature
-      - cooling_alarm_state
-    derived_signals:
-      - cap_clock_power_factor
-    time_alignment: "Reduce only the samples or intervals where caps, clocks, or limit states overlap the capacity window."
-    formula: >
-      Convert power caps, clocks, P-states, and active limit states into a
-      per-SKU multiplicative cap factor using site-calibrated curves. Treat
-      sustained active limits as capacity reductions and possible benign
-      explanations for reduced achieved throughput.
-    concrete_computation:
-      type: multiplicative_capacity_factor
-      source_refs: [S07, S08, S09, S40, S41]
-      evidence_status: calibration_default
-      formula: |
-        clock_factor = min(1, observed_core_clock_hz / reference_core_clock_hz)
-        power_factor = min(1, accelerator_power_cap_watts / reference_power_limit_watts)
-        active_limit_factor = min(source_or_default_limit_factor for active limit states)
-        cap_clock_power_factor = clamp(min(clock_factor, power_factor, active_limit_factor), 0, 1)
-      defaults:
-        - name: active_power_limit_factor
+  - id: power_clock_cap_screen
+    purpose: sparse_power_clock_capacity_limit_screen
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [accelerator_power_cap_watts]
+        - [accelerator_core_clock_hz]
+        - [accelerator_memory_clock_hz]
+        - [accelerator_p_state]
+        - [accelerator_throttle_state]
+        - [accelerator_performance_limit_state]
+    emitted_statement:
+      label: power_clock_limit_capacity_screen
+      category: capacity_power_service
+      max_confidence: weak
+      statement: "Power caps, clocks, P-states, throttle states, or performance-limit states can reduce cap-adjusted capacity during overlapping windows."
+    trigger:
+      type: one_feature_power_clock_limit_logic
+      evaluation_window: power_clock_or_limit_sample_window
+      conditions:
+        any:
+          - metric: normalized_clock_or_power_factor
+            op: "<="
+            value_ref: max_capacity_factor_for_limit_screen
+          - metric: active_limit_state
+            op: in
+            value_ref: capacity_limiting_states
+      calibration_defaults:
+        - name: max_capacity_factor_for_limit_screen
           value: 0.80
           unit: fraction
           evidence_status: calibration_default
-          rationale: "Executable default until per-SKU power/performance curves are available."
-          counterevidence_or_failure_modes: ["active caps can be non-binding or more severe"]
-          calibration_note: "Replace with measured curves."
-        - name: active_thermal_or_throttle_factor
-          value: 0.70
-          unit: fraction
-          evidence_status: calibration_default
-          rationale: "Executable default for sustained active thermal/throttle states."
-          counterevidence_or_failure_modes: ["transient throttle states may not materially reduce throughput"]
-          calibration_note: "Calibrate by throttle duration and achieved-rate impact."
-    output_fields:
-      - cap_clock_power_factor
-      - limiting_state
-      - affected_sku
-      - affected_window
-      - calibration_source
-    confidence_label: likely
-    source_refs: [S07, S08, S09, S40, S41]
+          source_refs: [S07, S08, S09]
+          rationale: "A 20 percent or larger cap/clock reduction is material enough for sparse capacity review."
+          counterevidence_or_failure_modes:
+            - "some active limit states are transient or non-binding"
+            - "reference clocks and power limits are SKU-specific"
+          calibration_note: "Replace with per-SKU cap, clock, and achieved-rate curves."
+        - name: capacity_limiting_states
+          value: [active, throttled, limited, degraded, power_limited, thermal_limited]
+          unit: categorical_set
+          evidence_status: source_informed
+          source_refs: [S07, S08, S09]
+          rationale: "Vendor telemetry exposes power, thermal, throttle, performance-state, and limit-state surfaces that can constrain capacity."
+          counterevidence_or_failure_modes:
+            - "state names and semantics vary by vendor, driver, and source"
+          calibration_note: "Normalize limit-state labels and required duration per source."
+    false_positive_or_limitations:
+      - "Limit states explain reduced capacity but do not prove or disprove activity."
+    cannot_conclude: [training, no_activity, achieved_compute]
+    promotion_policy: "Join with reference clocks, power, and overlap windows in derived capacity and aggregation review."
+    source_refs: [S07, S08, S09]
 
-  - id: cap_health_degraded_device_adjustment
-    purpose: capacity_reduction
-    required_features:
-      - accelerator_health_error_state
-    optional_features:
-      - local_link_error_recovery_throttle
-      - rdma_congestion_retry_drop_error_counters
-      - topology_change_events
-      - maintenance_operation_intervals
-      - inventory_lifecycle_events
-    derived_signals:
-      - available_accelerator_fraction
-    time_alignment: "Subtract devices or links only while degraded/error state overlaps the audited window and affected scope."
-    formula: >
-      Classify persistent degraded devices, resets, ECC/XID-like errors, retired
-      pages, or link failures as unavailable when site policy would drain or
-      remove them from service. Keep transient errors as caveats unless they
-      materially interrupt the window.
-    output_fields:
-      - affected_asset_count
-      - degraded_state
-      - unavailable_fraction
-      - explanation_category
-      - confidence
-    confidence_label: likely
-    source_refs: [S07, S08, S09, S42, S43]
-
-  - id: cap_topology_domain_constraint
-    purpose: topology_capacity_bound
-    required_features:
-      - scaleout_fabric_domain_graph
-    optional_features:
-      - local_accelerator_interconnect_domain
-      - cross_site_or_dci_connectivity
-      - topology_change_events
-      - local_link_error_recovery_throttle
-      - rdma_congestion_retry_drop_error_counters
-      - fabric_port_device_sample_counters
-      - maintenance_operation_intervals
-    derived_signals:
-      - largest_usable_topology_domain
-    time_alignment: "Split topology validity at link, route, switch, maintenance, and topology-change event times."
-    formula: >
-      Compute the largest simultaneously usable low-latency participant domain
-      and effective fabric constraints. If the domain cannot connect enough
-      accelerators at sufficient effective bandwidth for the target training
-      hypothesis, reduce the feasible capacity for synchronized training.
-    output_fields:
-      - largest_domain_accelerator_count
-      - effective_bisection_bandwidth_gbps
-      - excluded_devices_or_links
-      - topology_confidence
-    confidence_label: conservative_bound
-    source_refs: [S11, S15, S16, S17, S25, S42, S43]
-
-  - id: cap_cloud_capacity_constraint
-    purpose: provider_capacity_bound
-    required_features:
-      - instance_type_shape_machine_type
-    optional_features:
-      - compute_running_intervals
-      - capacity_reservation_intervals
-      - reservation_state_intervals
-      - quota_limit_intervals
-      - capacity_exception_events
-      - accelerator_compute_billing_usage_intervals
-      - accelerator_reservation_billing_usage_intervals
-      - container_resource_request_quantity
-      - container_resource_limit_quantity
-    derived_signals:
-      - available_accelerator_fraction
-      - telemetry_coverage_fraction
-    time_alignment: "Intersect provider shape validity, running intervals, enforced quotas, reservation windows, and billing intervals."
-    formula: >
-      Bound cloud-side capacity by instance shape, actual running state, active
-      reservations, enforced quota, capacity exceptions, and billing records.
-      Treat reservations and quotas as availability or limits, not workload
-      identity.
-    output_fields:
-      - provider_scope
-      - shape_or_sku
-      - running_accelerator_hours
-      - reserved_accelerator_hours
-      - enforced_quota_bound
-      - capacity_exception_summary
-    confidence_label: conservative_bound
-    source_refs: [S23, S24, S26, S27, S34, S35]
-
-  - id: cap_electrical_installation_timeline
-    purpose: physical_site_capacity_bound
-    required_features:
-      - electrical_service_status_intervals
-      - asset_receiving_installation_events
-    optional_features:
-      - utility_interconnection_status_intervals
-      - electrical_permit_status_intervals
-      - inventory_lifecycle_events
-      - facility_or_room_it_power_rollup
-      - rack_pdu_it_power
-      - maintenance_operation_intervals
-    derived_signals:
-      - available_accelerator_fraction
-      - capacity_upper_bound_flop
-    time_alignment: "Capacity cannot start before receipt/installation/commissioning and sufficient electrical service overlap unless alternate capacity is documented."
-    formula: >
-      Establish earliest plausible service and installation windows for the
-      monitored site. Cap physical capacity by energized service, usable IT load
-      fraction, installed assets, and commissioning state.
-    output_fields:
-      - earliest_plausible_capacity_time
-      - service_capacity_mw
-      - installed_asset_count
-      - physical_capacity_bound
-      - caveats
-    confidence_label: conservative_bound
-    source_refs: [S40, S41, S44]
-
-  - id: cap_negative_certification_inputs
-    purpose: no_threshold_run_support
-    required_features:
-      - accelerator_count_by_family_sku
-      - advertised_peak_rate_by_precision
-    optional_features:
-      - compute_running_intervals
-      - allocated_accelerator_count_by_sku
-      - generic_achieved_operation_rate
-      - tensor_matrix_mxu_neuron_or_engine_active_fraction
-      - accelerator_busy_or_utilization_fraction
-      - scaleout_port_tx_rx_bytes_packets
-      - storage_write_operation_bytes
-      - accelerator_device_power_energy
-      - rack_pdu_it_power
-    derived_signals:
-      - capacity_upper_bound_flop
-      - telemetry_coverage_fraction
-      - achieved_operation_integral
-    time_alignment: "Evaluate no-run support only over audited windows with explicit source coverage fractions."
-    formula: >
-      Support a no-threshold-run conclusion when capacity upper bound is below
-      the policy threshold, or trusted activity upper bound/lower-bound channels
-      with high coverage show no candidate windows. Never issue a strong
-      negative label when large capacity exists but primary activity channels
-      are missing or untrusted.
+  - id: health_availability_screen
+    purpose: sparse_health_capacity_limit_screen
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [accelerator_health_error_state]
+    emitted_statement:
+      label: health_degraded_capacity_availability_screen
+      category: capacity_availability
+      max_confidence: weak
+      statement: "Device health, reset, error, link-error, throttle, or degraded-state counters can reduce available accelerator capacity or explain capacity gaps."
     trigger:
-      type: negative_certification_threshold_logic
-      evaluation_window: audited_no_run_window
-      source_refs: [S01, S03, S27, S28, S29, S30, S31, S35]
+      type: one_feature_health_availability_logic
+      evaluation_window: health_sample_window
+      conditions:
+        any:
+          - metric: degraded_state
+            op: "=="
+            value: true
+          - metric: health_error_delta_count
+            op: ">="
+            value_ref: min_health_error_delta_count_for_review
+          - metric: reset_or_throttle_event_delta_count
+            op: ">="
+            value_ref: min_reset_or_throttle_delta_count_for_review
+      calibration_defaults:
+        - name: min_health_error_delta_count_for_review
+          value: 1
+          unit: events
+          evidence_status: source_informed
+          source_refs: [S07, S08, S09]
+          rationale: "Any new source-reported health/error event is useful sparse availability context."
+          counterevidence_or_failure_modes:
+            - "transient corrected errors may not affect capacity"
+          calibration_note: "Replace with source-specific severity and drain-policy thresholds."
+        - name: min_reset_or_throttle_delta_count_for_review
+          value: 1
+          unit: events
+          evidence_status: source_informed
+          source_refs: [S07, S08, S09]
+          rationale: "Reset or throttle events can affect capacity and time alignment even when brief."
+          counterevidence_or_failure_modes:
+            - "short events can be operationally benign"
+          calibration_note: "Calibrate by event type, duration, and affected device fraction."
+    false_positive_or_limitations:
+      - "Health errors require source-specific severity interpretation."
+    cannot_conclude: [training, no_training, achieved_compute]
+    promotion_policy: "Join with affected asset counts and overlap windows in derived capacity and aggregation review."
+    source_refs: [S07, S08, S09]
+
+  - id: reservation_capacity_screen
+    purpose: sparse_reservation_capacity_screen
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [reservation_state_intervals]
+        - [capacity_reservation_intervals]
+    emitted_statement:
+      label: reservation_capacity_availability_screen
+      category: capacity_availability
+      max_confidence: screen
+      statement: "Reservation records indicate capacity availability or holding, not observed accelerator activity."
+    trigger:
+      type: one_feature_reservation_logic
+      evaluation_window: reservation_interval
+      conditions:
+        all:
+          - metric: reserved_or_recorded_accelerator_count
+            op: ">="
+            value_ref: min_reserved_accelerator_count_to_emit
+          - metric: reservation_state
+            op: in
+            value_ref: active_reservation_states
+      calibration_defaults:
+        - name: min_reserved_accelerator_count_to_emit
+          value: 1
+          unit: accelerators
+          evidence_status: source_backed
+          source_refs: [S23, S24, S26, S35]
+          rationale: "A nonzero reservation count is a capacity-availability fact."
+          counterevidence_or_failure_modes:
+            - "reserved capacity may not be launched or used"
+          calibration_note: "Map provider and scheduler reservation fields to accelerator counts."
+        - name: active_reservation_states
+          value: [active, reserved, fulfilled, committed, available]
+          unit: categorical_set
+          evidence_status: source_informed
+          source_refs: [S23, S24, S26, S35]
+          rationale: "Only active or fulfilled reservation states support availability."
+          counterevidence_or_failure_modes:
+            - "provider state names and effective start times vary"
+          calibration_note: "Normalize local scheduler/provider reservation states."
+    false_positive_or_limitations:
+      - "Reservation is not a running or billing record."
+    cannot_conclude: [activity, achieved_compute, training]
+    promotion_policy: "Join with running and billing intervals for accelerator-hour facts."
+    source_refs: [S23, S24, S26, S35]
+
+  - id: quota_capacity_limit_screen
+    purpose: sparse_quota_capacity_limit_screen
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [quota_limit_intervals]
+    emitted_statement:
+      label: quota_capacity_limit_screen
+      category: capacity_availability
+      max_confidence: weak
+      statement: "Quota intervals can allow, cap, or forbid accelerator capacity only when the quota scope and resource type match the monitored claim."
+    trigger:
+      type: one_feature_quota_logic
+      evaluation_window: quota_interval
+      conditions:
+        all:
+          - metric: quota_limit_value
+            op: ">="
+            value_ref: min_quota_limit_value_to_emit
+          - metric: quota_resource_type_is_accelerator
+            op: "=="
+            value: true
+      calibration_defaults:
+        - name: min_quota_limit_value_to_emit
+          value: 0
+          unit: quota_units
+          evidence_status: source_backed
+          source_refs: [S23, S24, S35]
+          rationale: "Even a zero quota is useful as a capacity-limit fact if the scope and resource type match."
+          counterevidence_or_failure_modes:
+            - "quotas can be changed outside the observed interval or split across accounts/projects"
+          calibration_note: "Normalize quota unit, account/project/region scope, and effective-time semantics."
+    false_positive_or_limitations:
+      - "Quota does not prove actual capacity or activity."
+      - "Unenforced or mismatched quota scopes cannot support strong limits."
+    cannot_conclude: [activity, training, physical_capacity]
+    promotion_policy: "Join with usage, reservation, and quota records in capacity and discrepancy aggregation."
+    source_refs: [S23, S24, S35]
+
+  - id: running_accelerator_hours_screen
+    purpose: sparse_running_usage_capacity_screen
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [compute_running_intervals]
+        - [accelerator_compute_billing_usage_intervals]
+    emitted_statement:
+      label: running_or_billed_accelerator_hours_screen
+      category: capacity_availability
+      max_confidence: screen
+      statement: "Running or billed accelerator-bearing compute intervals imply accelerator-hours existed, but not the workload type or achieved operations."
+    trigger:
+      type: one_feature_accelerator_hour_logic
+      evaluation_window: running_or_billing_interval
+      conditions:
+        all:
+          - metric: accelerator_hours
+            op: ">="
+            value_ref: min_accelerator_hours_to_emit
+          - metric: interval_record_coverage_fraction
+            op: ">="
+            value_ref: min_running_or_billing_coverage_fraction
+      calibration_defaults:
+        - name: min_accelerator_hours_to_emit
+          value: 1
+          unit: accelerator_hours
+          evidence_status: source_backed
+          source_refs: [S23, S24, S26, S35]
+          rationale: "One accelerator-hour is enough to emit a sparse use-of-capacity fact."
+          counterevidence_or_failure_modes:
+            - "billing records can aggregate or lag actual running intervals"
+          calibration_note: "Normalize usage quantity units and provider/scheduler time boundaries."
+        - name: min_running_or_billing_coverage_fraction
+          value: 0.50
+          unit: fraction
+          evidence_status: source_informed
+          source_refs: [S23, S26, S35]
+          rationale: "Sparse capacity facts can be useful with partial coverage, but should carry coverage caveats."
+          counterevidence_or_failure_modes:
+            - "partial billing export can hide start/end times"
+          calibration_note: "Replace with provider export completeness and aggregation interval."
+    false_positive_or_limitations:
+      - "Running/billing can cover idle, serving, inference, HPC, or setup time."
+    cannot_conclude: [training, achieved_compute]
+    promotion_policy: "Join with activity counters for run-existence candidates and with peak rate for capacity upper bounds."
+    source_refs: [S23, S24, S26, S35]
+
+  - id: reservation_billing_capacity_screen
+    purpose: sparse_reserved_capacity_billing_screen
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [accelerator_reservation_billing_usage_intervals]
+    emitted_statement:
+      label: reserved_capacity_billing_screen
+      category: capacity_availability
+      max_confidence: screen
+      statement: "Accelerator reservation billing shows paid or held capacity over time, not observed compute activity."
+    trigger:
+      type: one_feature_reservation_billing_logic
+      evaluation_window: reservation_billing_interval
+      conditions:
+        all:
+          - metric: reserved_capacity_usage_quantity
+            op: ">="
+            value_ref: min_reserved_capacity_usage_quantity_to_emit
+      calibration_defaults:
+        - name: min_reserved_capacity_usage_quantity_to_emit
+          value: 1
+          unit: provider_usage_units
+          evidence_status: source_backed
+          source_refs: [S23, S26, S35]
+          rationale: "Nonzero reservation usage quantity is a capacity-holding fact."
+          counterevidence_or_failure_modes:
+            - "billing units may be dollars, hours, instance-hours, or reservation-hours depending on export settings"
+          calibration_note: "Normalize billing usage units and reservation SKU mapping."
+    false_positive_or_limitations:
+      - "Reservation billing can occur without active launched instances."
+    cannot_conclude: [activity, training, achieved_compute]
+    promotion_policy: "Join with reservation, running, or quota records for provider capacity consistency."
+    source_refs: [S23, S26, S35]
+
+  - id: electrical_service_capacity_screen
+    purpose: sparse_physical_power_service_screen
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [utility_interconnection_status_intervals]
+        - [electrical_service_status_intervals]
+        - [electrical_permit_status_intervals]
+    emitted_statement:
+      label: electrical_service_capacity_screen
+      category: capacity_power_service
+      max_confidence: weak
+      statement: "Utility, electrical-service, or permit records can support or limit physical capacity timing and IT-load plausibility."
+    trigger:
+      type: one_feature_electrical_service_logic
+      evaluation_window: electrical_or_utility_interval
       conditions:
         any:
           - all:
-              - metric: capacity_upper_bound_flop.capacity_upper_bound_operations
-                op: "<"
-                value_ref: policy_threshold_operations
-              - metric: capacity_upper_bound_flop.coverage_fraction
+              - metric: service_or_contracted_capacity_mw
                 op: ">="
-                value_ref: min_capacity_coverage_fraction
+                value_ref: min_service_capacity_mw_to_emit
+              - metric: service_or_permit_state
+                op: in
+                value_ref: capacity_supporting_service_states
           - all:
-              - metric: achieved_operation_integral.operation_count
-                op: "<"
-                value_ref: policy_threshold_operations
-              - metric: telemetry_coverage_fraction.primary_channel_min
-                op: ">="
-                value_ref: min_activity_coverage_fraction
-              - metric: candidate_training_window_count
-                op: "=="
-                value: 0
-        none:
-          - metric: strongest_missing_channel_score
+              - metric: service_or_permit_state
+                op: in
+                value_ref: capacity_limiting_service_states
+      calibration_defaults:
+        - name: min_service_capacity_mw_to_emit
+          value: 1.0
+          unit: megawatts
+          evidence_status: calibration_default
+          source_refs: [S40, S41, S44]
+          rationale: "One megawatt is a useful sparse facility-scale capacity fact, while exact accelerator capacity depends on power chain and PUE/IT-load mapping."
+          counterevidence_or_failure_modes:
+            - "service capacity can be shared with non-accelerator loads"
+            - "temporary generation or alternate feeds can be out of records"
+          calibration_note: "Replace with site electrical one-line, IT-load allocation, and commissioning records."
+        - name: capacity_supporting_service_states
+          value: [active, energized, approved, in_service, connected, commissioned]
+          unit: categorical_set
+          evidence_status: source_informed
+          source_refs: [S40, S41, S44]
+          rationale: "Supportive service states indicate plausible power availability."
+          counterevidence_or_failure_modes:
+            - "public or permit records can lag actual energization"
+          calibration_note: "Normalize utility, permit, and facility state names."
+        - name: capacity_limiting_service_states
+          value: [requested, pending, denied, suspended, not_energized, disconnected, expired]
+          unit: categorical_set
+          evidence_status: source_informed
+          source_refs: [S40, S41, S44]
+          rationale: "Limiting states route physical feasibility review."
+          counterevidence_or_failure_modes:
+            - "records can be incomplete or apply to only part of a site"
+          calibration_note: "Normalize state labels and effective dates per source."
+    false_positive_or_limitations:
+      - "Electrical service records are capacity context, not activity."
+    cannot_conclude: [activity, training, no_threshold_run]
+    promotion_policy: "Join with asset and power telemetry in capacity-segment and discrepancy aggregation."
+    source_refs: [S40, S41, S44]
+
+  - id: installation_timeline_capacity_screen
+    purpose: sparse_asset_installation_timeline_screen
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [asset_receiving_installation_events]
+    emitted_statement:
+      label: asset_installation_capacity_timeline_screen
+      category: capacity_power_service
+      max_confidence: weak
+      statement: "Asset receipt or installation events bound the earliest plausible local capacity timeline, subject to commissioning and service records."
+    trigger:
+      type: one_feature_asset_timeline_logic
+      evaluation_window: asset_event_time_with_validity_extension
+      conditions:
+        all:
+          - metric: asset_quantity
             op: ">="
-            value_ref: missing_channel_suppression_score
-      missing_data_behavior: "If any primary activity or capacity channel has unknown expected coverage, emit inconclusive rather than no-run."
-      confidence_mapping:
-        weak: "Some capacity/activity evidence is below threshold but important channels are incomplete."
-        medium: "Capacity upper bound or trusted activity integral is below threshold with primary coverage."
-        strong: "Capacity upper bound below threshold with high capacity input coverage and no missing primary channel."
-    calibration_defaults:
-      - name: policy_threshold_operations
-        value: 1.0e25
-        unit: operations
-        evidence_status: source_backed
-        source_refs: [S01, S03]
-        rationale: "Policy threshold for no-threshold-run evaluation."
-        counterevidence_or_failure_modes:
-          - "Threshold is a scale classifier and does not identify training."
-        calibration_note: "Replace only if policy changes."
-      - name: min_capacity_coverage_fraction
-        value: 0.90
-        unit: fraction
-        evidence_status: calibration_default
-        source_refs: [S07, S08, S09, S18, S23, S26, S35, S40, S41]
-        rationale: "Strong negative claims need high capacity coverage."
-        counterevidence_or_failure_modes:
-          - "missing inventory or service records can understate capacity"
-        calibration_note: "Tune by source coverage and scope."
-      - name: min_activity_coverage_fraction
-        value: 0.90
-        unit: fraction
-        evidence_status: source_informed
-        source_refs: [S07, S08, S27, S28, S29, S30, S31, S35, S36, S37, S38, S39]
-        rationale: "No-activity or no-candidate claims require high primary telemetry coverage."
-        counterevidence_or_failure_modes:
-          - "sampled, delayed, or best-effort logs can miss work"
-        calibration_note: "Replace with source-specific coverage and delay."
-      - name: missing_channel_suppression_score
-        value: 0.50
-        unit: score_0_to_1
-        evidence_status: project_assumption
-        source_refs: [S27, S28, S29, S30, S31, S35]
-        rationale: "Important missing channels should suppress negative certification."
-        counterevidence_or_failure_modes:
-          - "channel importance depends on candidate path and monitored scope"
-        calibration_note: "Calibrate with evidence-combination model."
-    output_fields:
-      - no_run_support_label
-      - limiting_reason
-      - capacity_upper_bound_operations
-      - strongest_missing_channel
-      - coverage_summary
-    confidence_label: conservative_bound
-    source_refs: [S01, S03, S27, S28, S29, S30, S31, S35]
+            value_ref: min_asset_quantity_to_emit
+          - metric: event_type
+            op: in
+            value_ref: capacity_supporting_asset_event_types
+      calibration_defaults:
+        - name: min_asset_quantity_to_emit
+          value: 1
+          unit: assets
+          evidence_status: source_backed
+          source_refs: [S40, S41, S44]
+          rationale: "One source-emitted receipt or installation event is useful timeline context."
+          counterevidence_or_failure_modes:
+            - "receipt does not equal installed, tested, powered, or commissioned capacity"
+          calibration_note: "Map asset categories to accelerator, server, rack, and power-chain capacity."
+        - name: capacity_supporting_asset_event_types
+          value: [received, installed, commissioned, racked, accepted, in_service]
+          unit: categorical_set
+          evidence_status: source_informed
+          source_refs: [S40, S41, S44]
+          rationale: "These event types can establish a plausible capacity timeline."
+          counterevidence_or_failure_modes:
+            - "event naming varies; commissioning can lag receipt or installation"
+          calibration_note: "Normalize asset event taxonomy and commissioning delay."
+    false_positive_or_limitations:
+      - "Asset event records can be administrative and not operational."
+    cannot_conclude: [activity, energized_service, training]
+    promotion_policy: "Join with electrical service and inventory for physical timeline checks."
+    source_refs: [S40, S41, S44]
+
+  - id: maintenance_availability_screen
+    purpose: sparse_maintenance_capacity_screen
+    raw_feature_budget: 1
+    required_feature_sets:
+      any_one_of:
+        - [maintenance_operation_intervals]
+    emitted_statement:
+      label: maintenance_capacity_availability_screen
+      category: capacity_availability
+      max_confidence: weak
+      statement: "Maintenance intervals can reduce available capacity, split topology validity, or explain telemetry gaps during the affected window."
+    trigger:
+      type: one_feature_maintenance_availability_logic
+      evaluation_window: maintenance_interval
+      conditions:
+        any:
+          - metric: affected_asset_count
+            op: ">="
+            value_ref: min_maintenance_affected_asset_count
+          - metric: maintenance_status
+            op: in
+            value_ref: active_or_capacity_affecting_maintenance_states
+      calibration_defaults:
+        - name: min_maintenance_affected_asset_count
+          value: 1
+          unit: assets
+          evidence_status: source_informed
+          source_refs: [S18, S40, S41, S42, S43]
+          rationale: "Any affected asset can matter for sparse capacity routing when the scope is an accelerator cluster or fabric domain."
+          counterevidence_or_failure_modes:
+            - "maintenance records may be broad or unrelated to accelerator capacity"
+          calibration_note: "Map maintenance asset categories to capacity, topology, telemetry, and storage surfaces."
+        - name: active_or_capacity_affecting_maintenance_states
+          value: [active, in_progress, draining, offline, degraded, completed_with_impact]
+          unit: categorical_set
+          evidence_status: source_informed
+          source_refs: [S18, S40, S41, S42, S43]
+          rationale: "Active or impact states can reduce capacity or explain sparse-rule contradictions."
+          counterevidence_or_failure_modes:
+            - "completed or scheduled maintenance may not overlap actual impact"
+          calibration_note: "Normalize maintenance status and affected asset semantics."
+    false_positive_or_limitations:
+      - "Maintenance can over-explain if intervals are coarse."
+    cannot_conclude: [training, no_training, achieved_compute]
+    promotion_policy: "Join with health, topology, power, or telemetry coverage for derived capacity and discrepancy rules."
+    source_refs: [S18, S40, S41, S42, S43]
